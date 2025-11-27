@@ -21,7 +21,8 @@ export default function Login() {
       {/* Image de fond depuis /public */}
       <div 
         className="absolute inset-0 bg-cover bg-center opacity-40" 
-        style={{ backgroundImage: "url('/Fond.png')" }}
+        style={{ backgroundImage: `url('${import.meta.env.BASE_URL}Fond.png')` }}
+
       ></div>
 
       {/* Zone de connexion */}
