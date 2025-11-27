@@ -16,49 +16,91 @@ export default function Login() {
   };
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden">
-
-      {/* FOND */}
+    <div
+      style={{
+        minHeight: "100vh",
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundImage: "url('/Fond.png')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }}
+    >
       <div
-        className="absolute inset-0 bg-cover bg-center"
-        style={{ backgroundImage: "url('/Fond.png')" }}
-      ></div>
+        style={{
+          backgroundColor: "rgba(255, 255, 255, 0.8)",
+          padding: "2rem",
+          borderRadius: "0.75rem",
+          boxShadow: "0 10px 25px rgba(0,0,0,0.25)",
+          width: "320px",
+        }}
+      >
+        <h1
+          style={{
+            fontSize: "1.5rem",
+            fontWeight: "bold",
+            textAlign: "center",
+            marginBottom: "1.5rem",
+          }}
+        >
+          Connexion CTR
+        </h1>
 
-      {/* Overlay */}
-      <div className="absolute inset-0 bg-black/40"></div>
+        <input
+          type="email"
+          placeholder="Email"
+          style={{
+            width: "100%",
+            marginBottom: "0.75rem",
+            padding: "0.5rem",
+            borderRadius: "0.375rem",
+            border: "1px solid #ccc",
+          }}
+          onChange={(e) => setEmail(e.target.value)}
+        />
 
-      {/* Contenu */}
-      <div className="relative z-10 min-h-screen w-full flex items-center justify-center">
+        <input
+          type="password"
+          placeholder="Mot de passe"
+          style={{
+            width: "100%",
+            marginBottom: "0.75rem",
+            padding: "0.5rem",
+            borderRadius: "0.375rem",
+            border: "1px solid #ccc",
+          }}
+          onChange={(e) => setPassword(e.target.value)}
+        />
 
-        <div className="bg-white/80 backdrop-blur-md p-8 rounded-xl shadow-xl w-80">
-          <h1 className="text-2xl font-bold text-center mb-6">Connexion CTR</h1>
-
-          <input
-            type="email"
-            placeholder="Email"
-            className="w-full mb-3 p-2 rounded border"
-            onChange={(e) => setEmail(e.target.value)}
-          />
-
-          <input
-            type="password"
-            placeholder="Mot de passe"
-            className="w-full mb-3 p-2 rounded border"
-            onChange={(e) => setPassword(e.target.value)}
-          />
-
-          {error && (
-            <p className="text-red-600 text-sm text-center mb-2">{error}</p>
-          )}
-
-          <button
-            onClick={loginUser}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-lg"
+        {error && (
+          <p
+            style={{
+              color: "#dc2626",
+              fontSize: "0.875rem",
+              textAlign: "center",
+              marginBottom: "0.5rem",
+            }}
           >
-            Se connecter
-          </button>
-        </div>
+            {error}
+          </p>
+        )}
 
+        <button
+          onClick={loginUser}
+          style={{
+            width: "100%",
+            backgroundColor: "#2563eb",
+            color: "#fff",
+            padding: "0.5rem",
+            borderRadius: "0.5rem",
+            border: "none",
+            cursor: "pointer",
+          }}
+        >
+          Se connecter
+        </button>
       </div>
     </div>
   );
