@@ -7,13 +7,15 @@ export default function Login() {
   const [error, setError] = useState("");
 
   const loginUser = async () => {
-    try {
-      await account.createEmailSession(email, password);
-      window.location.href = "/";
-    } catch (err) {
-      setError("Identifiants incorrects");
-    }
-  };
+  try {
+    await account.createEmailSession(email, password);
+    window.location.href = "/";
+  } catch (err) {
+    console.error("Erreur login Appwrite :", err);
+    setError("Identifiants incorrects");
+  }
+};
+
 
   return (
     <div
