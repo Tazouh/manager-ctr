@@ -16,19 +16,18 @@ export default function Login() {
   };
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden">
+    <div className="relative h-screen w-full overflow-hidden">
 
-      {/* FOND */}
-      <div
-        className="absolute inset-0 bg-cover bg-center"
-        style={{ backgroundImage: "url('/Fond.png')" }}
-      ></div>
+  <div
+    className="absolute inset-0 bg-cover bg-center"
+    style={{ backgroundImage: "url('/Fond.png')" }}
+  ></div>
 
-      {/* Overlay */}
-      <div className="absolute inset-0 bg-black/40"></div>
+  <div className="absolute inset-0 bg-black/40"></div>
 
-      {/* Contenu */}
-      <div className="relative z-10 min-h-screen w-full flex items-center justify-center">
+  <div className="relative z-10 h-screen w-full flex items-center justify-center">
+
+
 
         <div className="bg-white/80 backdrop-blur-md p-8 rounded-xl shadow-xl w-80">
           <h1 className="text-2xl font-bold text-center mb-6">
