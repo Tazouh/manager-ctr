@@ -19,11 +19,17 @@ export default function Login() {
     <div className="h-screen w-screen flex items-center justify-center bg-black relative">
 
       {/* Image de fond depuis /public */}
-      <div 
-        className="absolute inset-0 bg-cover bg-center opacity-40" 
-        style={{ backgroundImage: `url('${import.meta.env.BASE_URL}Fond.png')` }}
+      <div className="absolute inset-0">
+  {/* Image de fond */}
+  <div
+    className="absolute inset-0 bg-cover bg-center"
+    style={{ backgroundImage: "url('/Fond.png')" }}
+  ></div>
 
-      ></div>
+  {/* Overlay assombrissant */}
+  <div className="absolute inset-0 bg-black/40"></div>
+</div>
+
 
       {/* Zone de connexion */}
       <div className="relative z-10 bg-white/80 backdrop-blur-md p-8 rounded-xl shadow-xl w-80">
