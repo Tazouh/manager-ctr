@@ -16,23 +16,22 @@ export default function Login() {
   };
 
   return (
-    <div className="relative h-screen w-full overflow-hidden">
+    <div className="relative min-h-screen w-full overflow-hidden">
 
-  <div
-    className="absolute inset-0 bg-cover bg-center"
-    style={{ backgroundImage: "url('/Fond.png')" }}
-  ></div>
+      {/* FOND */}
+      <div
+        className="absolute inset-0 bg-cover bg-center"
+        style={{ backgroundImage: "url('/Fond.png')" }}
+      ></div>
 
-  <div className="absolute inset-0 bg-black/40"></div>
+      {/* Overlay */}
+      <div className="absolute inset-0 bg-black/40"></div>
 
-  <div className="relative z-10 h-screen w-full flex items-center justify-center">
-
-
+      {/* Contenu */}
+      <div className="relative z-10 min-h-screen w-full flex items-center justify-center">
 
         <div className="bg-white/80 backdrop-blur-md p-8 rounded-xl shadow-xl w-80">
-          <h1 className="text-2xl font-bold text-center mb-6">
-            Connexion CTR
-          </h1>
+          <h1 className="text-2xl font-bold text-center mb-6">Connexion CTR</h1>
 
           <input
             type="email"
