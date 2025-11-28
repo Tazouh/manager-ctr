@@ -6,14 +6,14 @@ import AddChantierModal from "../components/AddChantierModal";
 import * as XLSX from "xlsx";
 
 // === Appwrite IDs ===
-const DB_ID = "692950f300288c67303a"; // ID de ta base planningCTR
+const DB_ID = "692950f300288c67303a";
 const TECH_COL = "techniciens";
 const CHANTIER_COL = "chantiers";
 const PLAN_COL = "planning";
 
 // === Période autorisée ===
-const MIN_DATE = new Date(2025, 11, 1); // 1 déc 2025
-const MAX_DATE = new Date(2050, 0, 31); // 31 jan 2050
+const MIN_DATE = new Date(2025, 11, 1);
+const MAX_DATE = new Date(2050, 0, 31);
 
 function clampDate(d) {
   if (d < MIN_DATE) return MIN_DATE;
@@ -48,11 +48,12 @@ function getISOWeek(d) {
 export default function Planning() {
   const navigate = useNavigate();
 
+  // === STATES ===
   const [techniciens, setTechniciens] = useState([]);
   const [chantiers, setChantiers] = useState([]);
   const [planning, setPlanning] = useState({});
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState("week"); // Vue par défaut = hebdo
+  const [viewMode, setViewMode] = useState("week");
 
   const [showTechModal, setShowTechModal] = useState(false);
   const [showChantierModal, setShowChantierModal] = useState(false);
@@ -60,11 +61,10 @@ export default function Planning() {
   const [quickMenu, setQuickMenu] = useState(null);
   const [modal, setModal] = useState(null);
 
-  // modales de gestion
   const [showManageTech, setShowManageTech] = useState(false);
   const [showManageChantier, setShowManageChantier] = useState(false);
 
-  // === CHARGEMENT DES DONNÉES ===
+  // === LOAD DATA ===
   useEffect(() => {
     loadTechniciens();
     loadChantiers();
@@ -97,7 +97,6 @@ export default function Planning() {
       res.documents.forEach((doc) => {
         if (!doc.date || !doc.technicienId) return;
 
-        // doc.date ex : "2025-12-15T00:00:00.000+00:00" -> "2025-12-15"
         const dateStr =
           typeof doc.date === "string"
             ? doc.date.slice(0, 10)
@@ -119,7 +118,7 @@ export default function Planning() {
     }
   }
 
-  // === SAUVEGARDE / SUPPRESSION PLANNING ===
+  // === SAVE & DELETE ===
   async function savePlanningCell(date, techId, updates) {
     const key = `${date}-${techId}`;
     const prev = planning[key];
@@ -146,12 +145,12 @@ export default function Planning() {
     loadPlanning();
   }
 
-  // === TECHNICIENS / CHANTIERS (renommer / supprimer / couleur) ===
+  // === GESTION TECH & CHANTIERS ===
   async function handleDeleteTechnicien(id) {
     if (!window.confirm("Supprimer ce technicien ?")) return;
     await databases.deleteDocument(DB_ID, TECH_COL, id);
-    await loadTechniciens();
-    await loadPlanning();
+    loadTechniciens();
+    loadPlanning();
   }
 
   async function handleRenameTechnicien(tech) {
@@ -167,11 +166,11 @@ export default function Planning() {
   async function handleDeleteChantier(id) {
     if (!window.confirm("Supprimer ce chantier ?")) return;
     await databases.deleteDocument(DB_ID, CHANTIER_COL, id);
-    await loadChantiers();
+    loadChantiers();
   }
 
   async function handleRenameChantier(chantier) {
-    const nouveauNom = window.prompt("Nouveau nom du chantier :", chantier.nom);
+    const nouveauNom = window.prompt("Nouveau nom :", chantier.nom);
     if (!nouveauNom || !nouveauNom.trim()) return;
 
     await databases.updateDocument(DB_ID, CHANTIER_COL, chantier.$id, {
@@ -189,7 +188,7 @@ export default function Planning() {
     loadChantiers();
   }
 
-  // === NAVIGATION MOIS / SEMAINE ===
+  // === NAVIGATION ===
   function nextMonth() {
     setCurrentDate((d) => {
       const x = new Date(d);
@@ -250,16 +249,15 @@ export default function Planning() {
     return days;
   }
 
-  // === COULEUR DU CHANTIER PAR NOM ===
+  // === COULEUR DU CHANTIER ===
   function getChantierColorByName(nom) {
     if (!nom) return null;
     const c = chantiers.find((ch) => ch.nom === nom);
     return c?.couleur || null;
   }
 
-  // === CONTENU CELLULE ===
+  // === CELLULE ===
   function renderCellContent(cell, showTitle = true) {
-    // Pour éviter le "—" en doublon sous le select en vue semaine
     if (!cell) return showTitle ? "—" : null;
 
     return (
@@ -269,35 +267,24 @@ export default function Planning() {
         )}
 
         {cell.petit && (
-          <div>
-            🚐 <span style={{ fontSize: "11px" }}>Petit déplacement</span>
-          </div>
+          <div>🚐 <span style={{ fontSize: "11px" }}>Petit déplacement</span></div>
         )}
 
         {cell.grand && (
-          <div>
-            🧳 <span style={{ fontSize: "11px" }}>Grand déplacement</span>
-          </div>
+          <div>🧳 <span style={{ fontSize: "11px" }}>Grand déplacement</span></div>
         )}
 
         {cell.nuit && (
-          <div>
-            🌙 <span style={{ fontSize: "11px" }}>Nuit ({cell.heuresNuit}h)</span>
-          </div>
+          <div>🌙 <span style={{ fontSize: "11px" }}>Nuit ({cell.heuresNuit}h)</span></div>
         )}
       </div>
     );
   }
 
-  // === MENU RAPIDE / MODALE SUPPLÉMENT ===
+  // === MENUS ===
   function openQuickMenu(e, date, techId) {
     e.preventDefault();
-    setQuickMenu({
-      x: e.clientX,
-      y: e.clientY,
-      date,
-      techId,
-    });
+    setQuickMenu({ x: e.clientX, y: e.clientY, date, techId });
   }
 
   function openModal(e, date, techId) {
@@ -387,38 +374,105 @@ export default function Planning() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
+// === RENDU VUE MENSUELLE ===
+function renderMonth() {
+  const days = getMonthDays(currentDate);
 
-  // === RENDU VUE MENSUELLE ===
-  function renderMonth() {
-    const days = getMonthDays(currentDate);
+  return (
+    <div style={{ padding: 20 }}>
+      {/* NAVIGATION */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          marginBottom: 15,
+        }}
+      >
+        <button
+          onClick={prevMonth}
+          style={{
+            padding: "6px 12px",
+            background: "#1f2937",
+            color: "white",
+            borderRadius: 8,
+            fontWeight: 600,
+          }}
+        >
+          ◀
+        </button>
 
-    return (
-      <div style={{ padding: 20 }}>
-        {/* NAVIGATION */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button onClick={prevMonth}>◀</button>
-          <h2>
-            {currentDate
-              .toLocaleString("fr-FR", { month: "long", year: "numeric" })
-              .toUpperCase()}
-          </h2>
-          <button onClick={nextMonth}>▶</button>
-        </div>
+        <h2
+          style={{
+            fontSize: "20px",
+            fontWeight: "700",
+            color: "#111827",
+            margin: 0,
+          }}
+        >
+          {currentDate
+            .toLocaleString("fr-FR", { month: "long", year: "numeric" })
+            .toUpperCase()}
+        </h2>
 
-        {/* TABLEAU */}
+        <button
+          onClick={nextMonth}
+          style={{
+            padding: "6px 12px",
+            background: "#1f2937",
+            color: "white",
+            borderRadius: 8,
+            fontWeight: 600,
+          }}
+        >
+          ▶
+        </button>
+      </div>
+
+      {/* TABLEAU */}
+      <div
+        style={{
+          width: "100%",
+          overflowX: "auto",
+        }}
+      >
         <table
           style={{
             width: "100%",
-            marginTop: 20,
+            minWidth: "700px",
             borderCollapse: "separate",
-            borderSpacing: "0 4px",
+            borderSpacing: "0 6px",
           }}
         >
           <thead>
             <tr>
-              <th>Date</th>
+              <th
+                style={{
+                  padding: "10px 6px",
+                  background: "#f3f4f6",
+                  borderRadius: "6px",
+                  textAlign: "center",
+                  fontWeight: 700,
+                  color: "#374151",
+                }}
+              >
+                Date
+              </th>
+
               {techniciens.map((t) => (
-                <th key={t.$id}>{t.nom}</th>
+                <th
+                  key={t.$id}
+                  style={{
+                    padding: "10px 6px",
+                    background: "#f3f4f6",
+                    borderRadius: "6px",
+                    textAlign: "center",
+                    fontWeight: 700,
+                    color: "#374151",
+                  }}
+                >
+                  {t.nom}
+                </th>
               ))}
             </tr>
           </thead>
@@ -431,22 +485,27 @@ export default function Planning() {
               return (
                 <React.Fragment key={dateStr}>
                   <tr>
+                    {/* CELLULE DATE */}
                     <td
                       style={{
-                        padding: 8,
-                        borderRight: "1px solid #ccc",
-                        background: "rgba(255,255,255,0.8)",
-                        backdropFilter: "blur(2px)",
+                        padding: "10px 6px",
+                        background: "#e5e7eb",
                         borderRadius: "6px",
+                        textAlign: "center",
+                        fontWeight: 600,
+                        color: "#1f2937",
                       }}
                     >
-                      <div>S{week}</div>
-                      <div>{d.toLocaleDateString("fr-FR", { weekday: "short" })}</div>
-                      <div>
+                      <div style={{ opacity: 0.7 }}>S{week}</div>
+                      <div style={{ fontSize: "13px" }}>
+                        {d.toLocaleDateString("fr-FR", { weekday: "short" })}
+                      </div>
+                      <div style={{ marginTop: 2 }}>
                         {pad(d.getDate())}/{pad(d.getMonth() + 1)}
                       </div>
                     </td>
 
+                    {/* CELLULES TECHNICIENS */}
                     {techniciens.map((t) => {
                       const key = `${dateStr}-${t.$id}`;
                       const cell = planning[key];
@@ -458,34 +517,63 @@ export default function Planning() {
                         <td
                           key={t.$id}
                           style={{
-                            padding: 6,
+                            padding: 0,
                             minWidth: "120px",
-                            backgroundColor: cell?.valeur
-                              ? chantierColor || "rgba(240,240,240,0.8)"
-                              : "rgba(255,255,255,0.7)",
-                            borderRadius: "6px",
-                            backdropFilter: "blur(2px)",
+                            backgroundColor: chantierColor || "#d1d5db",
+                            borderRadius: "8px",
                             cursor: "pointer",
+                            overflow: "hidden",
+                            boxShadow:
+                              chantierColor ? "0 0 8px rgba(0,0,0,0.15)" : "none",
                           }}
-                          onClick={(e) => openQuickMenu(e, dateStr, t.$id)} // menu rapide
-                          onContextMenu={(e) => openModal(e, dateStr, t.$id)} // supplément
+                          onClick={(e) => openQuickMenu(e, dateStr, t.$id)}
+                          onContextMenu={(e) => openModal(e, dateStr, t.$id)}
                         >
-                          {renderCellContent(cell, true)}
+                          <div
+                            style={{
+                              padding: "8px 4px",
+                              color: "black",
+                              fontWeight: 700,
+                              fontSize: "13px",
+                              wordBreak: "break-word",
+                              textAlign: "center",
+                            }}
+                          >
+                            {cell?.valeur || "—"}
+                          </div>
+
+                          {cell && (
+                            <div
+                              style={{
+                                fontSize: "11px",
+                                paddingBottom: 6,
+                                textAlign: "center",
+                                color: "#111",
+                              }}
+                            >
+                              {cell.petit && <div>🚐 Petit déplacement</div>}
+                              {cell.grand && <div>🧳 Grand déplacement</div>}
+                              {cell.nuit && (
+                                <div>🌙 Nuit ({cell.heuresNuit}h)</div>
+                              )}
+                            </div>
+                          )}
                         </td>
                       );
                     })}
                   </tr>
 
-                  {/* Ligne noire entre semaines */}
+                  {/* LIGNE SÉPARATION ENTRE SEMAINES */}
                   {(i === 0 || getISOWeek(d) !== getISOWeek(days[i - 1])) && (
                     <tr>
                       <td colSpan={1 + techniciens.length}>
                         <div
                           style={{
-                            height: "3px",
-                            background: "black",
-                            opacity: 0.7,
-                            margin: "6px 0",
+                            height: "4px",
+                            background: "#000",
+                            opacity: 0.4,
+                            margin: "10px 0",
+                            borderRadius: 4,
                           }}
                         />
                       </td>
@@ -497,39 +585,101 @@ export default function Planning() {
           </tbody>
         </table>
       </div>
-    );
-  }
+    </div>
+  );
+}
+// === RENDU VUE HEBDO ===
+function renderWeek() {
+  const days = getWeekDays(currentDate);
 
-  // === RENDU VUE HEBDO ===
-  function renderWeek() {
-    const days = getWeekDays(currentDate);
+  return (
+    <div style={{ padding: 20 }}>
+      {/* NAVIGATION SEMAINE */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          marginBottom: 15,
+        }}
+      >
+        <button
+          onClick={prevWeek}
+          style={{
+            padding: "6px 12px",
+            background: "#1f2937",
+            color: "white",
+            borderRadius: 8,
+            fontWeight: 600,
+          }}
+        >
+          ◀
+        </button>
 
-    return (
-      <div style={{ padding: 20 }}>
-        {/* NAVIGATION SEMAINE */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button onClick={prevWeek}>◀</button>
-          <h2>
-            Semaine {getISOWeek(currentDate)} —{" "}
-            {days[0].toLocaleDateString("fr-FR")} au{" "}
-            {days[4].toLocaleDateString("fr-FR")}
-          </h2>
-          <button onClick={nextWeek}>▶</button>
-        </div>
+        <h2
+          style={{
+            fontSize: "20px",
+            fontWeight: "700",
+            color: "#111827",
+            margin: 0,
+          }}
+        >
+          Semaine {getISOWeek(currentDate)} —{" "}
+          {days[0].toLocaleDateString("fr-FR")} au{" "}
+          {days[4].toLocaleDateString("fr-FR")}
+        </h2>
 
+        <button
+          onClick={nextWeek}
+          style={{
+            padding: "6px 12px",
+            background: "#1f2937",
+            color: "white",
+            borderRadius: 8,
+            fontWeight: 600,
+          }}
+        >
+          ▶
+        </button>
+      </div>
+
+      {/* TABLEAU */}
+      <div style={{ width: "100%", overflowX: "auto" }}>
         <table
           style={{
             width: "100%",
-            marginTop: 20,
+            minWidth: "700px",
             borderCollapse: "separate",
-            borderSpacing: "0 4px",
+            borderSpacing: "0 6px",
           }}
         >
           <thead>
             <tr>
-              <th>Technicien</th>
+              <th
+                style={{
+                  padding: "10px 6px",
+                  background: "#f3f4f6",
+                  borderRadius: 6,
+                  textAlign: "center",
+                  fontWeight: 700,
+                  color: "#374151",
+                }}
+              >
+                Technicien
+              </th>
+
               {days.map((d) => (
-                <th key={d}>
+                <th
+                  key={d}
+                  style={{
+                    padding: "10px 6px",
+                    background: "#f3f4f6",
+                    borderRadius: 6,
+                    textAlign: "center",
+                    fontWeight: 700,
+                    color: "#374151",
+                  }}
+                >
                   {d.toLocaleDateString("fr-FR", {
                     weekday: "short",
                     day: "2-digit",
@@ -543,17 +693,21 @@ export default function Planning() {
           <tbody>
             {techniciens.map((t) => (
               <tr key={t.$id}>
+                {/* NOM TECHNICIEN */}
                 <td
                   style={{
-                    fontWeight: "bold",
-                    background: "rgba(255,255,255,0.8)",
-                    borderRadius: "6px",
-                    padding: "6px",
+                    padding: "10px 6px",
+                    background: "#e5e7eb",
+                    borderRadius: 8,
+                    fontWeight: 700,
+                    color: "#1f2937",
+                    textAlign: "center",
                   }}
                 >
                   {t.nom}
                 </td>
 
+                {/* CELLULES TECHNICIEN */}
                 {days.map((d) => {
                   const dateStr = ymd(d);
                   const key = `${dateStr}-${t.$id}`;
@@ -566,21 +720,30 @@ export default function Planning() {
                     <td
                       key={dateStr}
                       style={{
-                        padding: 6,
-                        backgroundColor: cell?.valeur
-                          ? chantierColor || "rgba(240,240,240,0.8)"
-                          : "rgba(255,255,255,0.7)",
-                        borderRadius: "6px",
+                        padding: 0,
+                        backgroundColor: chantierColor || "#d1d5db",
+                        borderRadius: 8,
                         cursor: "pointer",
+                        overflow: "hidden",
+                        boxShadow:
+                          chantierColor ? "0 0 8px rgba(0,0,0,0.15)" : "none",
                       }}
-                      onContextMenu={(e) => openModal(e, dateStr, t.$id)} // uniquement supplément
+                      onContextMenu={(e) => openModal(e, dateStr, t.$id)}
                     >
+                      {/* SELECT – Choix du chantier */}
                       <select
                         style={{
                           width: "100%",
-                          padding: "4px",
-                          borderRadius: "4px",
-                          marginBottom: "4px",
+                          padding: "8px 8px",
+                          border: "none",
+                          outline: "none",
+                          backgroundColor: chantierColor || "#cbd5e1",
+                          color: "black",
+                          fontWeight: 700,
+                          fontSize: "13px",
+                          textAlign: "center",
+                          appearance: "none",
+                          borderRadius: "0px",
                         }}
                         value={cell?.valeur || ""}
                         onChange={(e) =>
@@ -597,7 +760,23 @@ export default function Planning() {
                         ))}
                       </select>
 
-                      {renderCellContent(cell, false)}
+                      {/* Infos supplémentaires */}
+                      {cell && (
+                        <div
+                          style={{
+                            padding: "4px 4px 6px",
+                            fontSize: "11px",
+                            textAlign: "center",
+                            color: "#111",
+                          }}
+                        >
+                          {cell.petit && <div>🚐 Petit</div>}
+                          {cell.grand && <div>🧳 Grand</div>}
+                          {cell.nuit && (
+                            <div>🌙 Nuit ({cell.heuresNuit}h)</div>
+                          )}
+                        </div>
+                      )}
                     </td>
                   );
                 })}
@@ -606,453 +785,620 @@ export default function Planning() {
           </tbody>
         </table>
       </div>
-    );
-  }
-
-  // === RENDU PRINCIPAL ===
-  return (
+    </div>
+  );
+}
+// === RENDU PRINCIPAL ===
+return (
+  <div
+    style={{
+      minHeight: "100vh",
+      width: "100%",
+      backgroundImage: "url('/Fond.png')",
+      backgroundSize: "cover",
+      backgroundPosition: "center",
+      position: "relative",
+      padding: "20px",
+    }}
+  >
+    {/* Overlay sombre */}
     <div
       style={{
-        minHeight: "100vh",
-        width: "100%",
-        backgroundImage: "url('/Fond.png')",
-        backgroundSize: "cover",
-        backgroundPosition: "center",
+        position: "absolute",
+        inset: 0,
+        backgroundColor: "rgba(0,0,0,0.35)",
+        backdropFilter: "blur(2px)",
+        zIndex: 0,
+      }}
+    />
+
+    {/* Card principale */}
+    <div
+      style={{
         position: "relative",
-        padding: "30px",
+        zIndex: 2,
+        maxWidth: "1000px",
+        margin: "0 auto",
+        background: "rgba(255,255,255,0.95)",
+        borderRadius: "16px",
+        padding: "25px",
+        boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
       }}
     >
-      {/* Overlay sombre */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          backgroundColor: "rgba(0,0,0,0.4)",
-          backdropFilter: "blur(2px)",
-          zIndex: 0,
-        }}
-      />
+      
 
-      {/* Contenu */}
+      {/* BARRE DES BOUTONS */}
+<div
+  style={{
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 16,
+    flexWrap: "wrap",
+  }}
+>
+
+  {/* ⬅ BOUTON RETOUR */}
+  <button
+    onClick={() => navigate("/dashboard")}
+    style={{
+      padding: "8px 14px",
+      borderRadius: 8,
+      background: "#374151",
+      color: "white",
+      fontWeight: 600,
+    }}
+  >
+    ⬅ Retour
+  </button>
+
+  <button
+    onClick={() => setViewMode("month")}
+    style={{
+      padding: "8px 14px",
+      borderRadius: 8,
+      background: viewMode === "month" ? "#2563eb" : "#e5e7eb",
+      color: viewMode === "month" ? "white" : "#1f2937",
+      fontWeight: 600,
+    }}
+  >
+    Vue mensuelle
+  </button>
+
+  <button
+    onClick={() => setViewMode("week")}
+    style={{
+      padding: "8px 14px",
+      borderRadius: 8,
+      background: viewMode === "week" ? "#2563eb" : "#e5e7eb",
+      color: viewMode === "week" ? "white" : "#1f2937",
+      fontWeight: 600,
+    }}
+  >
+    Vue hebdomadaire
+  </button>
+
+  <button
+    onClick={exportToExcel}
+    style={{
+      padding: "8px 14px",
+      borderRadius: 8,
+      background: "#059669",
+      color: "white",
+      fontWeight: 600,
+    }}
+  >
+    Export Excel
+  </button>
+
+  <button
+    onClick={() => setShowTechModal(true)}
+    style={{
+      marginLeft: "auto",
+      padding: "8px 16px",
+      borderRadius: 8,
+      background: "#2563eb",
+      color: "white",
+      fontWeight: 600,
+    }}
+  >
+    + Technicien
+  </button>
+
+  <button
+    onClick={() => setShowChantierModal(true)}
+    style={{
+      padding: "8px 16px",
+      borderRadius: 8,
+      background: "#10b981",
+      color: "white",
+      fontWeight: 600,
+    }}
+  >
+    + Chantier
+  </button>
+</div>
+
+
+      {/* TITRES / GESTION */}
       <div
         style={{
-          position: "relative",
-          zIndex: 2,
-          maxWidth: "95%",
-          margin: "0 auto",
-          background: "rgba(255,255,255,0.9)",
-          borderRadius: "12px",
-          padding: "20px",
-          boxShadow: "0 10px 25px rgba(0,0,0,0.25)",
+          display: "flex",
+          justifyContent: "space-between",
+          marginBottom: 20,
+          padding: "12px 18px",
+          background: "#f3f4f6",
+          borderRadius: 10,
+          boxShadow: "inset 0 0 5px rgba(0,0,0,0.05)",
         }}
       >
-        {/* Bouton retour Dashboard */}
-        <button
-          onClick={() => navigate("/dashboard")}
-          style={{
-            position: "absolute",
-            top: 110,
-            right: 20,
-            padding: "8px 14px",
-            background: "rgba(255,255,255,0.85)",
-            borderRadius: "6px",
-            boxShadow: "0 4px 10px rgba(0,0,0,0.2)",
-          }}
-        >
-          Retour
-        </button>
-
-        {/* BOUTONS DE VUE + AJOUT + EXPORT */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            marginBottom: 10,
-          }}
-        >
-          <button onClick={() => setViewMode("month")}>Vue mensuelle</button>
-          <button onClick={() => setViewMode("week")}>Vue hebdomadaire</button>
-
-          <button onClick={exportToExcel}>Export Excel</button>
-
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontWeight: 700, fontSize: 15 }}>Techniciens</span>
           <button
-            onClick={() => setShowTechModal(true)}
-            style={{ marginLeft: "auto", background: "#2563eb", color: "white" }}
-          >
-            + Technicien
-          </button>
-          <button
-            onClick={() => setShowChantierModal(true)}
-            style={{ background: "#16a34a", color: "white" }}
-          >
-            + Chantier
-          </button>
-        </div>
-
-        {/* BARRE TITRES + BOUTONS MODIFICATION */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            marginBottom: 20,
-            padding: "10px 15px",
-            background: "rgba(248,250,252,0.9)",
-            borderRadius: "8px",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontWeight: "bold" }}>Techniciens</span>
-            <button onClick={() => setShowManageTech(true)}>Modification</button>
-          </div>
-
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontWeight: "bold" }}>Chantiers</span>
-            <button onClick={() => setShowManageChantier(true)}>
-              Modification
-            </button>
-          </div>
-        </div>
-
-        {/* RENDU PLANNING */}
-        {viewMode === "month" ? renderMonth() : renderWeek()}
-
-        {/* QUICK MENU */}
-        {quickMenu && (
-          <div
+            onClick={() => setShowManageTech(true)}
             style={{
-              position: "fixed",
-              top: quickMenu.y,
-              left: quickMenu.x,
-              background: "rgba(30,30,30,0.95)",
+              background: "#374151",
               color: "white",
-              padding: "10px",
-              borderRadius: "6px",
-              boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
-              zIndex: 999,
+              padding: "6px 10px",
+              borderRadius: 6,
+              fontWeight: 600,
             }}
           >
+            Modifier
+          </button>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontWeight: 700, fontSize: 15 }}>Chantiers</span>
+          <button
+            onClick={() => setShowManageChantier(true)}
+            style={{
+              background: "#374151",
+              color: "white",
+              padding: "6px 10px",
+              borderRadius: 6,
+              fontWeight: 600,
+            }}
+          >
+            Modifier
+          </button>
+        </div>
+      </div>
+
+      {/* PLANNING */}
+      {viewMode === "month" ? renderMonth() : renderWeek()}
+
+      {/* QUICK MENU (clic droit cellule) */}
+      {quickMenu && (
+        <div
+          style={{
+            position: "fixed",
+            top: quickMenu.y,
+            left: quickMenu.x,
+            background: "#1f2937",
+            color: "white",
+            padding: "10px",
+            borderRadius: 8,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
+            zIndex: 999,
+            minWidth: "180px",
+          }}
+        >
+          <div
+            style={{
+              padding: "6px",
+              cursor: "pointer",
+              borderBottom: "1px solid #4b5563",
+            }}
+            onClick={() => {
+              savePlanningCell(quickMenu.date, quickMenu.techId, { valeur: "" });
+              setQuickMenu(null);
+            }}
+          >
+            — Aucun chantier
+          </div>
+
+          {chantiers.map((c) => (
             <div
-              style={{ padding: 4, cursor: "pointer" }}
+              key={c.$id}
+              style={{
+                padding: "6px",
+                cursor: "pointer",
+                borderBottom: "1px solid #4b5563",
+              }}
               onClick={() => {
                 savePlanningCell(quickMenu.date, quickMenu.techId, {
-                  valeur: "",
+                  valeur: c.nom,
                 });
                 setQuickMenu(null);
               }}
             >
-              —
+              {c.nom}
             </div>
+          ))}
+
+          <div
+            style={{ padding: 6, cursor: "pointer", textAlign: "center" }}
+            onClick={() => setQuickMenu(null)}
+          >
+            Fermer
+          </div>
+        </div>
+      )}
+
+      {/* MODALE SUPPLÉMENTS */}
+      {modal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.55)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 999,
+            padding: 20,
+          }}
+          onClick={() => setModal(null)}
+        >
+          <div
+            style={{
+              background: "white",
+              borderRadius: 12,
+              padding: 25,
+              width: "360px",
+              boxShadow: "0 8px 25px rgba(0,0,0,0.3)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ marginBottom: 10, fontSize: 20, fontWeight: 700 }}>
+              Supplément
+            </h3>
+
+            <p style={{ marginBottom: 12 }}>
+              <b>{techniciens.find((t) => t.$id === modal.techId)?.nom}</b> —{" "}
+              {modal.date}
+            </p>
+
+            {/* Cases à cocher */}
+            <label style={{ display: "block", marginTop: 8 }}>
+              <input
+                type="checkbox"
+                checked={modal.petit}
+                onChange={(e) => setModal({ ...modal, petit: e.target.checked })}
+              />{" "}
+              Petit déplacement
+            </label>
+
+            <label style={{ display: "block", marginTop: 8 }}>
+              <input
+                type="checkbox"
+                checked={modal.grand}
+                onChange={(e) => setModal({ ...modal, grand: e.target.checked })}
+              />{" "}
+              Grand déplacement
+            </label>
+
+            <label style={{ display: "block", marginTop: 8 }}>
+              <input
+                type="checkbox"
+                checked={modal.nuit}
+                onChange={(e) => setModal({ ...modal, nuit: e.target.checked })}
+              />{" "}
+              Travail de nuit
+            </label>
+
+            {modal.nuit && (
+              <input
+                type="number"
+                value={modal.heuresNuit}
+                onChange={(e) =>
+                  setModal({ ...modal, heuresNuit: Number(e.target.value) })
+                }
+                placeholder="Heures"
+                style={{
+                  width: "100%",
+                  padding: "6px 8px",
+                  marginTop: 6,
+                  borderRadius: 6,
+                  border: "1px solid #d1d5db",
+                }}
+              />
+            )}
+
+            {/* Secteur */}
+            <input
+              type="text"
+              placeholder="Secteur / lieu"
+              value={modal.secteur}
+              onChange={(e) =>
+                setModal({ ...modal, secteur: e.target.value })
+              }
+              style={{
+                width: "100%",
+                padding: "8px",
+                borderRadius: 6,
+                border: "1px solid #d1d5db",
+                marginTop: 10,
+              }}
+            />
+
+            {/* Boutons */}
+            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+              <button
+                style={{
+                  flex: 1,
+                  background: "#10b981",
+                  color: "white",
+                  padding: "8px",
+                  borderRadius: 8,
+                  fontWeight: 700,
+                }}
+                onClick={() => {
+                  savePlanningCell(modal.date, modal.techId, {
+                    valeur: modal.chantier,
+                    petit: modal.petit,
+                    grand: modal.grand,
+                    nuit: modal.nuit,
+                    heuresNuit: modal.heuresNuit,
+                    secteur: modal.secteur,
+                  });
+                  setModal(null);
+                }}
+              >
+                Valider
+              </button>
+
+              <button
+                style={{
+                  flex: 1,
+                  background: "#9ca3af",
+                  color: "white",
+                  padding: "8px",
+                  borderRadius: 8,
+                  fontWeight: 700,
+                }}
+                onClick={() => setModal(null)}
+              >
+                Annuler
+              </button>
+
+              <button
+                style={{
+                  flex: 1,
+                  background: "#ef4444",
+                  color: "white",
+                  padding: "8px",
+                  borderRadius: 8,
+                  fontWeight: 700,
+                }}
+                onClick={() => {
+                  deletePlanningCell(modal.date, modal.techId);
+                  setModal(null);
+                }}
+              >
+                Supprimer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modale gestion techniciens */}
+      {showManageTech && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.55)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 999,
+            padding: 20,
+          }}
+          onClick={() => setShowManageTech(false)}
+        >
+          <div
+            style={{
+              background: "white",
+              borderRadius: 12,
+              padding: 20,
+              width: 380,
+              maxHeight: "75vh",
+              overflowY: "auto",
+              boxShadow: "0 8px 20px rgba(0,0,0,0.25)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ marginBottom: 15, fontWeight: 700 }}>
+              Gestion des techniciens
+            </h3>
+
+            {techniciens.map((t) => (
+              <div
+                key={t.$id}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "10px",
+                  background: "#f9fafb",
+                  borderRadius: 8,
+                  marginBottom: 8,
+                }}
+              >
+                <span>{t.nom}</span>
+
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    onClick={() => handleRenameTechnicien(t)}
+                    style={{
+                      background: "#2563eb",
+                      color: "white",
+                      padding: "6px 10px",
+                      borderRadius: 6,
+                    }}
+                  >
+                    Renommer
+                  </button>
+
+                  <button
+                    onClick={() => handleDeleteTechnicien(t.$id)}
+                    style={{
+                      background: "#ef4444",
+                      color: "white",
+                      padding: "6px 10px",
+                      borderRadius: 6,
+                    }}
+                  >
+                    Supprimer
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            <div style={{ textAlign: "right", marginTop: 10 }}>
+              <button
+                onClick={() => setShowManageTech(false)}
+                style={{
+                  padding: "8px 14px",
+                  background: "#374151",
+                  color: "white",
+                  borderRadius: 8,
+                }}
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODALE GESTION CHANTIERS */}
+      {showManageChantier && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.55)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 999,
+            padding: 20,
+          }}
+          onClick={() => setShowManageChantier(false)}
+        >
+          <div
+            style={{
+              background: "white",
+              borderRadius: 12,
+              padding: 20,
+              width: 380,
+              maxHeight: "75vh",
+              overflowY: "auto",
+              boxShadow: "0 8px 20px rgba(0,0,0,0.25)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ marginBottom: 15, fontWeight: 700 }}>
+              Gestion des chantiers
+            </h3>
 
             {chantiers.map((c) => (
               <div
                 key={c.$id}
-                style={{ padding: 4, cursor: "pointer" }}
-                onClick={() => {
-                  savePlanningCell(quickMenu.date, quickMenu.techId, {
-                    valeur: c.nom,
-                  });
-                  setQuickMenu(null);
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "10px",
+                  background: "#f9fafb",
+                  borderRadius: 8,
+                  marginBottom: 8,
                 }}
               >
-                {c.nom}
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div
+                    style={{
+                      width: 18,
+                      height: 18,
+                      borderRadius: 4,
+                      background: c.couleur || "#9ca3af",
+                      border: "1px solid #6b7280",
+                    }}
+                  />
+                  <span>{c.nom}</span>
+                </div>
+
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input
+                    type="color"
+                    value={c.couleur || "#3b82f6"}
+                    onChange={(e) => handleChangeChantierColor(c, e.target.value)}
+                    style={{ width: 36, height: 26, border: "none" }}
+                  />
+
+                  <button
+                    onClick={() => handleRenameChantier(c)}
+                    style={{
+                      background: "#2563eb",
+                      color: "white",
+                      padding: "6px 10px",
+                      borderRadius: 6,
+                    }}
+                  >
+                    Renommer
+                  </button>
+
+                  <button
+                    onClick={() => handleDeleteChantier(c.$id)}
+                    style={{
+                      background: "#ef4444",
+                      color: "white",
+                      padding: "6px 10px",
+                      borderRadius: 6,
+                    }}
+                  >
+                    Supprimer
+                  </button>
+                </div>
               </div>
             ))}
 
-            <div
-              style={{ padding: 4, cursor: "pointer", color: "#ccc" }}
-              onClick={() => setQuickMenu(null)}
-            >
-              Fermer
+            <div style={{ textAlign: "right", marginTop: 10 }}>
+              <button
+                onClick={() => setShowManageChantier(false)}
+                style={{
+                  padding: "8px 14px",
+                  background: "#374151",
+                  color: "white",
+                  borderRadius: 8,
+                }}
+              >
+                Fermer
+              </button>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* MODALE SUPPLÉMENTS */}
-        {modal && (
-          <div
-            style={{
-              position: "fixed",
-              inset: 0,
-              background: "rgba(0,0,0,0.55)",
-              backdropFilter: "blur(3px)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              zIndex: 999,
-            }}
-            onClick={() => setModal(null)}
-          >
-            <div
-              style={{
-                background: "white",
-                borderRadius: "10px",
-                padding: "20px",
-                width: "350px",
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3 style={{ marginBottom: 10 }}>Supplément</h3>
+      {/* MODALES AJOUT */}
+      {showTechModal && (
+        <AddTechnicienModal
+          onClose={() => setShowTechModal(false)}
+          onAdded={loadTechniciens}
+        />
+      )}
 
-              <p>
-                <b>{techniciens.find((t) => t.$id === modal.techId)?.nom}</b> —{" "}
-                {modal.date}
-              </p>
-
-              <label>
-                <input
-                  type="checkbox"
-                  checked={modal.petit}
-                  onChange={(e) =>
-                    setModal({ ...modal, petit: e.target.checked })
-                  }
-                />{" "}
-                Petit déplacement
-              </label>
-              <br />
-
-              <label>
-                <input
-                  type="checkbox"
-                  checked={modal.grand}
-                  onChange={(e) =>
-                    setModal({ ...modal, grand: e.target.checked })
-                  }
-                />{" "}
-                Grand déplacement
-              </label>
-              <br />
-
-              <label>
-                <input
-                  type="checkbox"
-                  checked={modal.nuit}
-                  onChange={(e) =>
-                    setModal({ ...modal, nuit: e.target.checked })
-                  }
-                />{" "}
-                Travail de nuit
-              </label>
-
-              {modal.nuit && (
-                <input
-                  type="number"
-                  value={modal.heuresNuit}
-                  onChange={(e) =>
-                    setModal({
-                      ...modal,
-                      heuresNuit: Number(e.target.value),
-                    })
-                  }
-                  placeholder="Heures"
-                  style={{ width: "100%", marginTop: 5 }}
-                />
-              )}
-
-              <input
-                type="text"
-                placeholder="Secteur / lieu"
-                value={modal.secteur}
-                onChange={(e) =>
-                  setModal({ ...modal, secteur: e.target.value })
-                }
-                style={{ width: "100%", marginTop: 10 }}
-              />
-
-              <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-                <button
-                  style={{ flex: 1, background: "green", color: "white" }}
-                  onClick={() => {
-                    savePlanningCell(modal.date, modal.techId, {
-                      valeur: modal.chantier,
-                      petit: modal.petit,
-                      grand: modal.grand,
-                      nuit: modal.nuit,
-                      heuresNuit: modal.heuresNuit,
-                      secteur: modal.secteur,
-                    });
-                    setModal(null);
-                  }}
-                >
-                  Valider
-                </button>
-
-                <button style={{ flex: 1 }} onClick={() => setModal(null)}>
-                  Annuler
-                </button>
-
-                <button
-                  style={{ flex: 1, background: "red", color: "white" }}
-                  onClick={() => {
-                    deletePlanningCell(modal.date, modal.techId);
-                    setModal(null);
-                  }}
-                >
-                  Supprimer
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* MODALE GESTION TECHNICIENS */}
-        {showManageTech && (
-          <div
-            style={{
-              position: "fixed",
-              inset: 0,
-              background: "rgba(0,0,0,0.55)",
-              backdropFilter: "blur(3px)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              zIndex: 999,
-            }}
-            onClick={() => setShowManageTech(false)}
-          >
-            <div
-              style={{
-                background: "white",
-                borderRadius: "10px",
-                padding: "20px",
-                width: "360px",
-                maxHeight: "70vh",
-                overflowY: "auto",
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3 style={{ marginBottom: 10 }}>Gestion des techniciens</h3>
-              {techniciens.length === 0 && <div>Aucun technicien</div>}
-              {techniciens.map((t) => (
-                <div
-                  key={t.$id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginBottom: 6,
-                  }}
-                >
-                  <span>{t.nom}</span>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <button onClick={() => handleRenameTechnicien(t)}>
-                      Renommer
-                    </button>
-                    <button
-                      onClick={() => handleDeleteTechnicien(t.$id)}
-                      style={{ background: "#ef4444", color: "white" }}
-                    >
-                      Supprimer
-                    </button>
-                  </div>
-                </div>
-              ))}
-
-              <div style={{ textAlign: "right", marginTop: 10 }}>
-                <button onClick={() => setShowManageTech(false)}>Fermer</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* MODALE GESTION CHANTIERS */}
-        {showManageChantier && (
-          <div
-            style={{
-              position: "fixed",
-              inset: 0,
-              background: "rgba(0,0,0,0.55)",
-              backdropFilter: "blur(3px)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              zIndex: 999,
-            }}
-            onClick={() => setShowManageChantier(false)}
-          >
-            <div
-              style={{
-                background: "white",
-                borderRadius: "10px",
-                padding: "20px",
-                width: "380px",
-                maxHeight: "70vh",
-                overflowY: "auto",
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3 style={{ marginBottom: 10 }}>Gestion des chantiers</h3>
-              {chantiers.length === 0 && <div>Aucun chantier</div>}
-              {chantiers.map((c) => (
-                <div
-                  key={c.$id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginBottom: 6,
-                  }}
-                >
-                  <div
-                    style={{ display: "flex", alignItems: "center", gap: 8 }}
-                  >
-                    <div
-                      style={{
-                        width: 16,
-                        height: 16,
-                        borderRadius: 4,
-                        backgroundColor: c.couleur || "#9ca3af",
-                        border: "1px solid #4b5563",
-                      }}
-                    />
-                    <span>{c.nom}</span>
-                  </div>
-                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    <input
-                      type="color"
-                      value={c.couleur || "#3b82f6"}
-                      onChange={(e) =>
-                        handleChangeChantierColor(c, e.target.value)
-                      }
-                      style={{ width: 32, height: 24, border: "none" }}
-                    />
-                    <button onClick={() => handleRenameChantier(c)}>
-                      Renommer
-                    </button>
-                    <button
-                      onClick={() => handleDeleteChantier(c.$id)}
-                      style={{ background: "#ef4444", color: "white" }}
-                    >
-                      Supprimer
-                    </button>
-                  </div>
-                </div>
-              ))}
-
-              <div style={{ textAlign: "right", marginTop: 10 }}>
-                <button onClick={() => setShowManageChantier(false)}>
-                  Fermer
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* MODALES AJOUT */}
-        {showTechModal && (
-          <AddTechnicienModal
-            onClose={() => setShowTechModal(false)}
-            onAdded={loadTechniciens}
-          />
-        )}
-
-        {showChantierModal && (
-          <AddChantierModal
-            onClose={() => setShowChantierModal(false)}
-            onAdded={loadChantiers}
-          />
-        )}
-      </div>
+      {showChantierModal && (
+        <AddChantierModal
+          onClose={() => setShowChantierModal(false)}
+          onAdded={loadChantiers}
+        />
+      )}
     </div>
-  );
+  </div>
+);
 }
