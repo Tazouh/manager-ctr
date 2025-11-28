@@ -72,22 +72,51 @@ export default function Planning() {
   }, []);
 
   async function loadTechniciens() {
-    const res = await databases.listDocuments(DB_ID, TECH_COL);
-    setTechniciens(res.documents);
+    try {
+      const res = await databases.listDocuments(DB_ID, TECH_COL);
+      setTechniciens(res.documents);
+    } catch (err) {
+      console.error("Erreur loadTechniciens :", err);
+    }
   }
 
   async function loadChantiers() {
-    const res = await databases.listDocuments(DB_ID, CHANTIER_COL);
-    setChantiers(res.documents);
+    try {
+      const res = await databases.listDocuments(DB_ID, CHANTIER_COL);
+      setChantiers(res.documents);
+    } catch (err) {
+      console.error("Erreur loadChantiers :", err);
+    }
   }
 
   async function loadPlanning() {
-    const res = await databases.listDocuments(DB_ID, PLAN_COL);
-    const obj = {};
-    res.documents.forEach((doc) => {
-      obj[`${doc.date}-${doc.technicienId}`] = doc;
-    });
-    setPlanning(obj);
+    try {
+      const res = await databases.listDocuments(DB_ID, PLAN_COL);
+
+      const obj = {};
+      res.documents.forEach((doc) => {
+        if (!doc.date || !doc.technicienId) return;
+
+        // doc.date ex : "2025-12-15T00:00:00.000+00:00" -> "2025-12-15"
+        const dateStr =
+          typeof doc.date === "string"
+            ? doc.date.slice(0, 10)
+            : (() => {
+                const d = new Date(doc.date);
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, "0");
+                const day = String(d.getDate()).padStart(2, "0");
+                return `${y}-${m}-${day}`;
+              })();
+
+        const key = `${dateStr}-${doc.technicienId}`;
+        obj[key] = doc;
+      });
+
+      setPlanning(obj);
+    } catch (err) {
+      console.error("Erreur loadPlanning :", err);
+    }
   }
 
   // === SAUVEGARDE / SUPPRESSION PLANNING ===
@@ -230,7 +259,8 @@ export default function Planning() {
 
   // === CONTENU CELLULE ===
   function renderCellContent(cell, showTitle = true) {
-    if (!cell) return "—";
+    // Pour éviter le "—" en doublon sous le select en vue semaine
+    if (!cell) return showTitle ? "—" : null;
 
     return (
       <div style={{ fontSize: "12px" }}>
@@ -293,7 +323,6 @@ export default function Planning() {
     const days =
       viewMode === "month" ? getMonthDays(currentDate) : getWeekDays(currentDate);
 
-    // Ligne d'en-tête
     const header = [
       "Technicien",
       ...days.map((d) =>
@@ -438,8 +467,8 @@ export default function Planning() {
                             backdropFilter: "blur(2px)",
                             cursor: "pointer",
                           }}
-                          onClick={(e) => openQuickMenu(e, dateStr, t.$id)}
-                          onContextMenu={(e) => openModal(e, dateStr, t.$id)}
+                          onClick={(e) => openQuickMenu(e, dateStr, t.$id)} // menu rapide
+                          onContextMenu={(e) => openModal(e, dateStr, t.$id)} // supplément
                         >
                           {renderCellContent(cell, true)}
                         </td>
@@ -544,8 +573,7 @@ export default function Planning() {
                         borderRadius: "6px",
                         cursor: "pointer",
                       }}
-                      onClick={(e) => openQuickMenu(e, dateStr, t.$id)}
-                      onContextMenu={(e) => openModal(e, dateStr, t.$id)}
+                      onContextMenu={(e) => openModal(e, dateStr, t.$id)} // uniquement supplément
                     >
                       <select
                         style={{
@@ -618,7 +646,7 @@ export default function Planning() {
           boxShadow: "0 10px 25px rgba(0,0,0,0.25)",
         }}
       >
-        {/* Bouton retour Dashboard - descendu */}
+        {/* Bouton retour Dashboard */}
         <button
           onClick={() => navigate("/dashboard")}
           style={{
@@ -707,7 +735,9 @@ export default function Planning() {
             <div
               style={{ padding: 4, cursor: "pointer" }}
               onClick={() => {
-                savePlanningCell(quickMenu.date, quickMenu.techId, { valeur: "" });
+                savePlanningCell(quickMenu.date, quickMenu.techId, {
+                  valeur: "",
+                });
                 setQuickMenu(null);
               }}
             >
@@ -963,7 +993,9 @@ export default function Planning() {
                     marginBottom: 6,
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: 8 }}
+                  >
                     <div
                       style={{
                         width: 16,

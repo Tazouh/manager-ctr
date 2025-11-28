@@ -1,0 +1,121 @@
+import React, { useEffect, useState, useRef } from "react";
+import { databases, storage, ID, Query, account } from "../appwrite";
+import "./Chat.css";
+
+const DB_ID = "692950f300288c67303a";
+const CHAT_COL = "conversationkey";
+const MESSAGE_COL = "messages"; // À CRÉER SI PAS FAIT
+
+export default function Chat() {
+  const [messages, setMessages] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [text, setText] = useState("");
+  const [file, setFile] = useState(null);
+  const bottomRef = useRef();
+
+  // 🔵 Charger l'utilisateur connecté
+  useEffect(() => {
+    account.get().then(setCurrentUser);
+  }, []);
+
+  // 🔵 Charger les messages
+  useEffect(() => {
+    loadMessages();
+  }, []);
+
+  async function loadMessages() {
+    try {
+      const res = await databases.listDocuments(DB_ID, MESSAGE_COL, [
+        Query.orderAsc("$createdAt")
+      ]);
+      setMessages(res.documents);
+      scrollToBottom();
+    } catch (e) {
+      console.log("Erreur loadMessages :", e);
+    }
+  }
+
+  function scrollToBottom() {
+    setTimeout(() => {
+      if (bottomRef.current) bottomRef.current.scrollIntoView({ behavior: "smooth" });
+    }, 100);
+  }
+
+  // 🔵 Envoi message texte ou média
+  async function handleSend() {
+    if (!text && !file) return;
+
+    let fileId = null;
+
+    // 📸 Upload media
+    if (file) {
+      const uploaded = await storage.createFile("default", ID.unique(), file);
+      fileId = uploaded.$id;
+    }
+
+    await databases.createDocument(DB_ID, MESSAGE_COL, ID.unique(), {
+      senderId: currentUser.$id,
+      text: text || "",
+      fileId,
+    });
+
+    setText("");
+    setFile(null);
+    loadMessages();
+  }
+
+  return (
+    <div className="chat-container">
+      <div className="chat-header">
+        Chat – iPhone Style
+      </div>
+
+      <div className="messages-list">
+        {messages.map((m) => (
+          <div
+            key={m.$id}
+            className={`message-row ${m.senderId === currentUser?.$id ? "sent" : "received"}`}
+          >
+            <div className={`message-bubble ${m.senderId === currentUser?.$id ? "sent" : "received"}`}>
+              {m.text}
+
+              {m.fileId && (
+                <img
+                  className="message-image"
+                  src={storage.getFilePreview("default", m.fileId)}
+                  alt="media"
+                />
+              )}
+            </div>
+          </div>
+        ))}
+        <div ref={bottomRef}></div>
+      </div>
+
+      <div className="chat-input-area">
+        <div className="chat-icon">😀</div>
+
+        <label className="chat-icon" style={{ cursor: "pointer" }}>
+          📸
+          <input
+            type="file"
+            accept="image/*,video/*"
+            style={{ display: "none" }}
+            onChange={(e) => setFile(e.target.files[0])}
+          />
+        </label>
+
+        <input
+          className="chat-input"
+          placeholder="Message..."
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+        />
+
+        <button className="send-btn" onClick={handleSend}>
+          Envoyer
+        </button>
+      </div>
+    </div>
+  );
+}

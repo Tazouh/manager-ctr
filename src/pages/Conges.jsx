@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { databases, ID, account } from "../appwrite";
 
+// Styles de base
 const backgroundStyle = {
   minHeight: "100vh",
   width: "100%",
@@ -84,14 +85,6 @@ export default function Conges() {
   // 🔸 onglet actif : "form" | "responses"
   const [activeTab, setActiveTab] = useState("form");
 
-  // 🔔 nb de réponses non encore vues (statut != en attente ET vuUser != true)
-  const nbReponses = myRequests.filter(
-    (req) =>
-      req.statut &&
-      req.statut !== "en attente" &&
-      !req.vuUser
-  ).length;
-
   // 🔐 Récupérer l'utilisateur + ses demandes de congé
   const loadMyRequests = async () => {
     try {
@@ -122,6 +115,11 @@ export default function Conges() {
   useEffect(() => {
     loadMyRequests();
   }, []);
+
+  // 🔔 nb de réponses non encore vues (statut != en attente ET vuUser != true)
+  const nbReponses = myRequests.filter(
+    (req) => req.statut && req.statut !== "en attente" && !req.vuUser
+  ).length;
 
   // 🔸 Cliquer sur "Modifier" : pré-remplir le formulaire (si en attente)
   const startEdit = (req) => {
@@ -183,7 +181,6 @@ export default function Conges() {
       });
 
       if (editingId) {
-        // 🔧 Mise à jour d'une demande existante (seulement si toujours "en attente")
         const req = myRequests.find((r) => r.$id === editingId);
         if (!req || req.statut !== "en attente") {
           alert(
@@ -198,7 +195,6 @@ export default function Conges() {
           alert("Demande de congé mise à jour ✅");
         }
       } else {
-        // ➕ Nouvelle demande
         await databases.createDocument(DB_ID, CONGES_COL, ID.unique(), {
           dateDebut,
           dateFin,
@@ -207,13 +203,12 @@ export default function Conges() {
           userName: user ? user.name : null,
           statut: "en attente",
           createdAt: new Date().toISOString(),
-          vuUser: false, // 👈 rien à voir encore, donc non vue
+          vuUser: false,
         });
 
         alert("Demande de congé enregistrée ✅");
       }
 
-      // reset du formulaire + sortie du mode édition
       setDateDebut("");
       setDateFin("");
       setCommentaire("");
@@ -377,7 +372,7 @@ export default function Conges() {
                       width: "100%",
                       padding: "0.5rem",
                       borderRadius: "0.375rem",
-                      border: "1px solid d1d5db",
+                      border: "1px solid #d1d5db",
                     }}
                   />
                 </div>
@@ -402,7 +397,7 @@ export default function Conges() {
                       width: "100%",
                       padding: "0.5rem",
                       borderRadius: "0.375rem",
-                      border: "1px solid d1d5db",
+                      border: "1px solid #d1d5db",
                     }}
                   />
                 </div>
@@ -428,7 +423,7 @@ export default function Conges() {
                       width: "100%",
                       padding: "0.5rem",
                       borderRadius: "0.375rem",
-                      border: "1px solid d1d5db",
+                      border: "1px solid #d1d5db",
                       resize: "vertical",
                     }}
                   />
