@@ -8,7 +8,9 @@ import Planning from "./pages/Planning.jsx";
 import Inventaire from "./pages/Inventaire.jsx";
 import Conges from "./pages/Conges.jsx";
 import Chat from "./pages/Chat.jsx";
-import Gestion from "./pages/Gestion.jsx";   // 👈 AJOUT
+import Gestion from "./pages/Gestion.jsx";
+import SuiviTravaux from "./pages/SuiviTravaux.jsx";
+
 
 function App() {
   const [loading, setLoading] = useState(true);
@@ -48,7 +50,6 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* ---- PAGE LOGIN ---- */}
         {!isAuthenticated && (
           <Route
             path="/"
@@ -56,7 +57,6 @@ function App() {
           />
         )}
 
-        {/* ---- PAGES PROTÉGÉES ---- */}
         {isAuthenticated && (
           <>
             <Route
@@ -77,11 +77,13 @@ function App() {
 
             <Route path="/chat" element={<Chat />} />
 
-            <Route path="/gestion" element={<Gestion />} /> {/* 👈 AJOUT */}
+            <Route path="/gestion" element={<Gestion />} />
+
+            <Route path="/suivi-travaux" element={<SuiviTravaux />} />
+
           </>
         )}
 
-        {/* Redirection par défaut */}
         <Route
           path="*"
           element={<Navigate to={isAuthenticated ? "/dashboard" : "/"} />}

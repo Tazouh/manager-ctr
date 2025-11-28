@@ -226,7 +226,7 @@ export default function Dashboard({ onLogout }) {
 
                 <li
                   style={itemStyle}
-                  onClick={() => handleItemClick("Suivi travaux")}
+                  onClick={() => navigate("/suivi-travaux")}
                 >
                   Suivi travaux
                 </li>
