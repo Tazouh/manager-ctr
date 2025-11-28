@@ -549,8 +549,8 @@ export default function Planning() {
           onClick={() => navigate("/dashboard")}
           style={{
             position: "absolute",
-            top: 60,
-            right: 20,
+            top: 100,
+            right: 100,
             padding: "8px 14px",
             background: "rgba(255,255,255,0.85)",
             borderRadius: "6px",
