@@ -107,12 +107,12 @@ const updateStatut = async (docId, newStatut) => {
   try {
     setUpdatingId(docId);
 
-    // on récupère ce qu'il y a dans la zone de texte
     const texte = commentDrafts[docId] ?? "";
 
     await databases.updateDocument(DB_ID, CONGES_COL, docId, {
       statut: newStatut,
-      commentaireAdmin: texte,   // 👈 on sauvegarde aussi le commentaire
+      commentaireAdmin: texte,
+      vuUser: false, // 👈 nouvelle décision → à revoir pour le tech
     });
 
     await loadConges();
@@ -123,6 +123,7 @@ const updateStatut = async (docId, newStatut) => {
     setUpdatingId(null);
   }
 };
+
 
 
   // enregistre le commentaire admin
@@ -288,218 +289,278 @@ const updateStatut = async (docId, newStatut) => {
             </p>
           ) : (
             <div style={{ overflowX: "auto" }}>
-              <table
+  <table
+    style={{
+      width: "100%",
+      borderCollapse: "separate",
+      borderSpacing: "0 4px",   // un peu d'espace entre les lignes
+      fontSize: "0.9rem",
+    }}
+  >
+    <thead>
+      <tr>
+        <th
+          style={{
+            textAlign: "left",
+            padding: "8px 10px",
+            borderBottom: "1px solid #e5e7eb",
+            minWidth: 130,
+          }}
+        >
+          Technicien
+        </th>
+        <th
+          style={{
+            textAlign: "left",
+            padding: "8px 10px",
+            borderBottom: "1px solid #e5e7eb",
+            minWidth: 120,
+          }}
+        >
+          Début
+        </th>
+        <th
+          style={{
+            textAlign: "left",
+            padding: "8px 10px",
+            borderBottom: "1px solid #e5e7eb",
+            minWidth: 120,
+          }}
+        >
+          Fin
+        </th>
+        <th
+          style={{
+            textAlign: "left",
+            padding: "8px 10px",
+            borderBottom: "1px solid #e5e7eb",
+            minWidth: 160,
+          }}
+        >
+          Commentaire technicien
+        </th>
+        <th
+          style={{
+            textAlign: "left",
+            padding: "8px 10px",
+            borderBottom: "1px solid #e5e7eb",
+            minWidth: 190,
+          }}
+        >
+          Commentaire admin
+        </th>
+        <th
+          style={{
+            textAlign: "left",
+            padding: "8px 10px",
+            borderBottom: "1px solid #e5e7eb",
+            minWidth: 110,
+          }}
+        >
+          Statut
+        </th>
+        <th
+          style={{
+            textAlign: "left",
+            padding: "8px 10px",
+            borderBottom: "1px solid #e5e7eb",
+            minWidth: 170,
+          }}
+        >
+          Actions
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      {conges.map((c) => (
+        <tr key={c.$id}>
+          <td
+            style={{
+              padding: "8px 10px",
+              verticalAlign: "top",
+            }}
+          >
+            {c.userName || c.userId || "—"}
+          </td>
+          <td
+            style={{
+              padding: "8px 10px",
+              verticalAlign: "top",
+            }}
+          >
+            {formatDateFr(c.dateDebut)}
+          </td>
+          <td
+            style={{
+              padding: "8px 10px",
+              verticalAlign: "top",
+            }}
+          >
+            {formatDateFr(c.dateFin)}
+          </td>
+          <td
+            style={{
+              padding: "8px 10px",
+              verticalAlign: "top",
+              maxWidth: 220,
+            }}
+          >
+            {c.commentaire || <span style={{ opacity: 0.6 }}>—</span>}
+          </td>
+
+          {/* COMMENTAIRE ADMIN : textarea seulement si "en attente" */}
+          <td
+            style={{
+              padding: "8px 10px",
+              verticalAlign: "top",
+              maxWidth: 260,
+            }}
+          >
+            {c.statut === "en attente" ? (
+              <>
+                <textarea
+                  rows={2}
+                  value={commentDrafts[c.$id] ?? ""}
+                  onChange={(e) =>
+                    setCommentDrafts((prev) => ({
+                      ...prev,
+                      [c.$id]: e.target.value,
+                    }))
+                  }
+                  style={{
+                    width: "100%",
+                    padding: "4px",
+                    borderRadius: "0.375rem",
+                    border: "1px solid #d1d5db",
+                    resize: "vertical",
+                    fontSize: "0.85rem",
+                  }}
+                />
+                <button
+                  type="button"
+                  disabled={updatingId === c.$id}
+                  onClick={() => saveAdminComment(c.$id)}
+                  style={{
+                    marginTop: "4px",
+                    padding: "2px 8px",
+                    borderRadius: "0.375rem",
+                    border: "none",
+                    backgroundColor: "#3b82f6",
+                    color: "#fff",
+                    fontSize: "0.8rem",
+                    cursor:
+                      updatingId === c.$id ? "not-allowed" : "pointer",
+                  }}
+                >
+                  Enregistrer
+                </button>
+              </>
+            ) : (
+              <div style={{ fontSize: "0.85rem" }}>
+                {c.commentaireAdmin && c.commentaireAdmin.trim() !== "" ? (
+                  c.commentaireAdmin
+                ) : (
+                  <span style={{ opacity: 0.6 }}>—</span>
+                )}
+              </div>
+            )}
+          </td>
+
+          <td
+            style={{
+              padding: "8px 10px",
+              verticalAlign: "top",
+            }}
+          >
+            <span
+              style={{
+                padding: "2px 8px",
+                borderRadius: 999,
+                backgroundColor:
+                  c.statut === "en attente"
+                    ? "#fde68a"
+                    : c.statut === "validé"
+                    ? "#bbf7d0"
+                    : "#fecaca",
+                border: "1px solid #e5e7eb",
+              }}
+            >
+              {c.statut || "—"}
+            </span>
+          </td>
+
+          <td
+            style={{
+              padding: "8px 10px",
+              verticalAlign: "top",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                gap: 6,
+                flexWrap: "wrap",
+              }}
+            >
+              <button
+                type="button"
+                disabled={updatingId === c.$id}
+                onClick={() => updateStatut(c.$id, "validé")}
                 style={{
-                  width: "100%",
-                  borderCollapse: "collapse",
-                  fontSize: "0.9rem",
+                  padding: "2px 8px",
+                  borderRadius: "0.375rem",
+                  border: "none",
+                  backgroundColor: "#22c55e",
+                  color: "#fff",
+                  fontSize: "0.8rem",
+                  cursor:
+                    updatingId === c.$id ? "not-allowed" : "pointer",
                 }}
               >
-                <thead>
-                  <tr>
-                    <th
-                      style={{
-                        textAlign: "left",
-                        padding: "6px 4px",
-                        borderBottom: "1px solid #e5e7eb",
-                      }}
-                    >
-                      Technicien
-                    </th>
-                    <th
-                      style={{
-                        textAlign: "left",
-                        padding: "6px 4px",
-                        borderBottom: "1px solid #e5e7eb",
-                      }}
-                    >
-                      Début
-                    </th>
-                    <th
-                      style={{
-                        textAlign: "left",
-                        padding: "6px 4px",
-                        borderBottom: "1px solid #e5e7eb",
-                      }}
-                    >
-                      Fin
-                    </th>
-                    <th
-                      style={{
-                        textAlign: "left",
-                        padding: "6px 4px",
-                        borderBottom: "1px solid #e5e7eb",
-                      }}
-                    >
-                      Commentaire technicien
-                    </th>
-                    <th
-                      style={{
-                        textAlign: "left",
-                        padding: "6px 4px",
-                        borderBottom: "1px solid #e5e7eb",
-                      }}
-                    >
-                      Commentaire admin
-                    </th>
-                    <th
-                      style={{
-                        textAlign: "left",
-                        padding: "6px 4px",
-                        borderBottom: "1px solid #e5e7eb",
-                      }}
-                    >
-                      Statut
-                    </th>
-                    <th
-                      style={{
-                        textAlign: "left",
-                        padding: "6px 4px",
-                        borderBottom: "1px solid #e5e7eb",
-                      }}
-                    >
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {conges.map((c) => (
-                    <tr key={c.$id}>
-                      <td style={{ padding: "4px" }}>
-                        {c.userName || c.userId || "—"}
-                      </td>
-                      <td style={{ padding: "4px" }}>
-                        {formatDateFr(c.dateDebut)}
-                      </td>
-                      <td style={{ padding: "4px" }}>
-                        {formatDateFr(c.dateFin)}
-                      </td>
-                      <td style={{ padding: "4px", maxWidth: 220 }}>
-                        {c.commentaire || (
-                          <span style={{ opacity: 0.6 }}>—</span>
-                        )}
-                      </td>
-                      <td style={{ padding: "4px", maxWidth: 240 }}>
-                        <textarea
-                          rows={2}
-                          value={commentDrafts[c.$id] ?? ""}
-                          onChange={(e) =>
-                            setCommentDrafts((prev) => ({
-                              ...prev,
-                              [c.$id]: e.target.value,
-                            }))
-                          }
-                          style={{
-                            width: "100%",
-                            padding: "4px",
-                            borderRadius: "0.375rem",
-                            border: "1px solid #d1d5db",
-                            resize: "vertical",
-                            fontSize: "0.85rem",
-                          }}
-                        />
-                        <button
-                          type="button"
-                          disabled={updatingId === c.$id}
-                          onClick={() => saveAdminComment(c.$id)}
-                          style={{
-                            marginTop: "4px",
-                            padding: "2px 8px",
-                            borderRadius: "0.375rem",
-                            border: "none",
-                            backgroundColor: "#3b82f6",
-                            color: "#fff",
-                            fontSize: "0.8rem",
-                            cursor:
-                              updatingId === c.$id ? "not-allowed" : "pointer",
-                          }}
-                        >
-                          Enregistrer
-                        </button>
-                      </td>
-                      <td style={{ padding: "4px" }}>
-                        <span
-                          style={{
-                            padding: "2px 8px",
-                            borderRadius: 999,
-                            backgroundColor:
-                              c.statut === "en attente"
-                                ? "#fde68a"
-                                : c.statut === "validé"
-                                ? "#bbf7d0"
-                                : "#fecaca",
-                            border: "1px solid #e5e7eb",
-                          }}
-                        >
-                          {c.statut || "—"}
-                        </span>
-                      </td>
-                      <td style={{ padding: "4px" }}>
-                        <div
-                          style={{
-                            display: "flex",
-                            gap: 6,
-                            flexWrap: "wrap",
-                          }}
-                        >
-                          <button
-                            type="button"
-                            disabled={updatingId === c.$id}
-                            onClick={() => updateStatut(c.$id, "validé")}
-                            style={{
-                              padding: "2px 8px",
-                              borderRadius: "0.375rem",
-                              border: "none",
-                              backgroundColor: "#22c55e",
-                              color: "#fff",
-                              fontSize: "0.8rem",
-                              cursor:
-                                updatingId === c.$id ? "not-allowed" : "pointer",
-                            }}
-                          >
-                            Valider
-                          </button>
-                          <button
-                            type="button"
-                            disabled={updatingId === c.$id}
-                            onClick={() => updateStatut(c.$id, "refusé")}
-                            style={{
-                              padding: "2px 8px",
-                              borderRadius: "0.375rem",
-                              border: "none",
-                              backgroundColor: "#ef4444",
-                              color: "#fff",
-                              fontSize: "0.8rem",
-                              cursor:
-                                updatingId === c.$id ? "not-allowed" : "pointer",
-                            }}
-                          >
-                            Refuser
-                          </button>
-                          <button
-                            type="button"
-                            disabled={updatingId === c.$id}
-                            onClick={() => updateStatut(c.$id, "en attente")}
-                            style={{
-                              padding: "2px 8px",
-                              borderRadius: "0.375rem",
-                              border: "1px solid #9ca3af",
-                              backgroundColor: "#f3f4f6",
-                              color: "#374151",
-                              fontSize: "0.8rem",
-                              cursor:
-                                updatingId === c.$id ? "not-allowed" : "pointer",
-                            }}
-                          >
-                            Remettre en attente
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                Valider
+              </button>
+              <button
+                type="button"
+                disabled={updatingId === c.$id}
+                onClick={() => updateStatut(c.$id, "refusé")}
+                style={{
+                  padding: "2px 8px",
+                  borderRadius: "0.375rem",
+                  border: "none",
+                  backgroundColor: "#ef4444",
+                  color: "#fff",
+                  fontSize: "0.8rem",
+                  cursor:
+                    updatingId === c.$id ? "not-allowed" : "pointer",
+                }}
+              >
+                Refuser
+              </button>
+              <button
+                type="button"
+                disabled={updatingId === c.$id}
+                onClick={() => updateStatut(c.$id, "en attente")}
+                style={{
+                  padding: "2px 8px",
+                  borderRadius: "0.375rem",
+                  border: "1px solid #9ca3af",
+                  backgroundColor: "#f3f4f6",
+                  color: "#374151",
+                  fontSize: "0.8rem",
+                  cursor:
+                    updatingId === c.$id ? "not-allowed" : "pointer",
+                }}
+              >
+                Remettre en attente
+              </button>
             </div>
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</div>
+
           )}
         </div>
       </div>

@@ -34,7 +34,7 @@ const cardStyle = {
   padding: "2rem",
   borderRadius: "0.75rem",
   boxShadow: "0 10px 25px rgba(0,0,0,0.25)",
-  width: "480px",
+  width: "520px",
   maxWidth: "95vw",
 };
 
@@ -42,14 +42,14 @@ const titleStyle = {
   fontSize: "1.5rem",
   fontWeight: "bold",
   textAlign: "center",
-  marginBottom: "1.5rem",
+  marginBottom: "1rem",
 };
 
 // IDs Appwrite
 const DB_ID = "692950f300288c67303a";
 const CONGES_COL = "conges";
 
-// 🔹 Formattage des dates type "28 Novembre 2025"
+// 🔹 Formatage dates : "28 Novembre 2025"
 function formatDateFr(value) {
   if (!value) return "";
   const d = new Date(value);
@@ -80,6 +80,17 @@ export default function Conges() {
 
   // 🔸 mode édition : null = nouvelle demande, sinon = id du document
   const [editingId, setEditingId] = useState(null);
+
+  // 🔸 onglet actif : "form" | "responses"
+  const [activeTab, setActiveTab] = useState("form");
+
+  // 🔔 nb de réponses non encore vues (statut != en attente ET vuUser != true)
+  const nbReponses = myRequests.filter(
+    (req) =>
+      req.statut &&
+      req.statut !== "en attente" &&
+      !req.vuUser
+  ).length;
 
   // 🔐 Récupérer l'utilisateur + ses demandes de congé
   const loadMyRequests = async () => {
@@ -112,7 +123,7 @@ export default function Conges() {
     loadMyRequests();
   }, []);
 
-  // 🔸 Cliquer sur "Modifier" : pré-remplir le formulaire
+  // 🔸 Cliquer sur "Modifier" : pré-remplir le formulaire (si en attente)
   const startEdit = (req) => {
     if (!currentUser || req.userId !== currentUser.$id) return;
     if (req.statut !== "en attente") return;
@@ -121,14 +132,30 @@ export default function Conges() {
     setDateFin(req.dateFin || "");
     setCommentaire(req.commentaire || "");
     setEditingId(req.$id);
+
+    // on bascule sur l'onglet formulaire
+    setActiveTab("form");
   };
 
-  // 🔸 Annuler le mode édition
+  // 🔸 Annuler mode édition
   const cancelEdit = () => {
     setEditingId(null);
     setDateDebut("");
     setDateFin("");
     setCommentaire("");
+  };
+
+  // 🔸 Marquer une réponse comme "vue" (vuUser = true)
+  const markSeen = async (reqId) => {
+    try {
+      await databases.updateDocument(DB_ID, CONGES_COL, reqId, {
+        vuUser: true,
+      });
+      await loadMyRequests();
+    } catch (err) {
+      console.error("Erreur markSeen congé :", err);
+      alert("Erreur lors de la mise à jour de la notification (voir console).");
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -180,6 +207,7 @@ export default function Conges() {
           userName: user ? user.name : null,
           statut: "en attente",
           createdAt: new Date().toISOString(),
+          vuUser: false, // 👈 rien à voir encore, donc non vue
         });
 
         alert("Demande de congé enregistrée ✅");
@@ -229,216 +257,355 @@ export default function Conges() {
               ← Retour
             </button>
 
-            <span style={{ fontWeight: "600", fontSize: "0.95rem", opacity: 0.7 }}>
+            <span
+              style={{
+                fontWeight: "600",
+                fontSize: "0.95rem",
+                opacity: 0.7,
+              }}
+            >
               Demande de congé
             </span>
           </div>
 
-          <h1 style={titleStyle}>
-            {editingId ? "Modifier une demande de congé" : "Formulaire de congés"}
-          </h1>
+          <h1 style={titleStyle}>Congés</h1>
 
-          {/* FORMULAIRE */}
-          <form onSubmit={handleSubmit}>
-            <div style={{ marginBottom: "1rem" }}>
-              <label
-                htmlFor="dateDebut"
-                style={{ display: "block", fontWeight: "500", marginBottom: "0.25rem" }}
-              >
-                Date de début
-              </label>
-              <input
-                id="dateDebut"
-                type="date"
-                value={dateDebut}
-                onChange={(e) => setDateDebut(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "0.5rem",
-                  borderRadius: "0.375rem",
-                  border: "1px solid #d1d5db",
-                }}
-              />
-            </div>
-
-            <div style={{ marginBottom: "1rem" }}>
-              <label
-                htmlFor="dateFin"
-                style={{ display: "block", fontWeight: "500", marginBottom: "0.25rem" }}
-              >
-                Date de fin
-              </label>
-              <input
-                id="dateFin"
-                type="date"
-                value={dateFin}
-                onChange={(e) => setDateFin(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "0.5rem",
-                  borderRadius: "0.375rem",
-                  border: "1px solid #d1d5db",
-                }}
-              />
-            </div>
-
-            <div style={{ marginBottom: "1.5rem" }}>
-              <label
-                htmlFor="commentaire"
-                style={{ display: "block", fontWeight: "500", marginBottom: "0.25rem" }}
-              >
-                Commentaire (optionnel)
-              </label>
-              <textarea
-                id="commentaire"
-                rows={3}
-                value={commentaire}
-                onChange={(e) => setCommentaire(e.target.value)}
-                placeholder="Ex : congés payés, récupération, raison..."
-                style={{
-                  width: "100%",
-                  padding: "0.5rem",
-                  borderRadius: "0.375rem",
-                  border: "1px solid #d1d5db",
-                  resize: "vertical",
-                }}
-              />
-            </div>
-
-            <div style={{ display: "flex", gap: 10 }}>
-              <button
-                type="submit"
-                disabled={loading}
-                style={{
-                  flex: 1,
-                  padding: "0.75rem",
-                  borderRadius: "0.5rem",
-                  border: "none",
-                  backgroundColor: loading ? "#9ca3af" : "#2563eb",
-                  color: "#fff",
-                  fontWeight: "600",
-                  cursor: loading ? "not-allowed" : "pointer",
-                }}
-              >
-                {loading
-                  ? "Envoi en cours..."
-                  : editingId
-                  ? "Enregistrer les modifications"
-                  : "Envoyer la demande"}
-              </button>
-
-              {editingId && (
-                <button
-                  type="button"
-                  onClick={cancelEdit}
-                  style={{
-                    padding: "0.75rem",
-                    borderRadius: "0.5rem",
-                    border: "1px solid #d1d5db",
-                    backgroundColor: "#f3f4f6",
-                    cursor: "pointer",
-                  }}
-                >
-                  Annuler
-                </button>
-              )}
-            </div>
-          </form>
-
-          {/* LISTE DES DEMANDES DU COMPTE */}
-          <div style={{ marginTop: "2rem" }}>
-            <h2
+          {/* ONGLET FORM / REPONSES */}
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              marginBottom: "1.25rem",
+              borderBottom: "1px solid #e5e7eb",
+              paddingBottom: 4,
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setActiveTab("form")}
               style={{
-                fontSize: "1.1rem",
-                fontWeight: "600",
-                marginBottom: "0.75rem",
+                padding: "0.35rem 0.8rem",
+                borderRadius: "0.5rem 0.5rem 0 0",
+                border: "1px solid #d1d5db",
+                borderBottom:
+                  activeTab === "form" ? "none" : "1px solid #d1d5db",
+                backgroundColor:
+                  activeTab === "form" ? "#ffffff" : "#f3f4f6",
+                fontSize: "0.9rem",
+                fontWeight: activeTab === "form" ? "600" : "500",
+                cursor: "pointer",
               }}
             >
-              Mes demandes de congé
-            </h2>
+              Faire une demande
+            </button>
 
-            {loadingRequests ? (
-              <p style={{ fontStyle: "italic", opacity: 0.7 }}>Chargement…</p>
-            ) : myRequests.length === 0 ? (
-              <p style={{ fontStyle: "italic", opacity: 0.7 }}>
-                Aucune demande enregistrée pour l’instant.
-              </p>
-            ) : (
-              <table
+            <button
+              type="button"
+              onClick={() => setActiveTab("responses")}
+              style={{
+                padding: "0.35rem 0.8rem",
+                borderRadius: "0.5rem 0.5rem 0 0",
+                border: "1px solid #d1d5db",
+                borderBottom:
+                  activeTab === "responses" ? "none" : "1px solid #d1d5db",
+                backgroundColor:
+                  activeTab === "responses" ? "#ffffff" : "#f3f4f6",
+                fontSize: "0.9rem",
+                fontWeight: activeTab === "responses" ? "600" : "500",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              Réponse
+              {nbReponses > 0 && (
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    minWidth: 20,
+                    height: 20,
+                    padding: "0 6px",
+                    borderRadius: 999,
+                    backgroundColor: "#ef4444",
+                    color: "#fff",
+                    fontSize: "0.75rem",
+                    fontWeight: "600",
+                  }}
+                >
+                  {nbReponses}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* ONGLET : FORMULAIRE */}
+          {activeTab === "form" && (
+            <>
+              <h2
                 style={{
-                  width: "100%",
-                  borderCollapse: "collapse",
-                  fontSize: "0.9rem",
+                  fontSize: "1.05rem",
+                  fontWeight: "600",
+                  marginBottom: "0.75rem",
                 }}
               >
-                <thead>
-                  <tr>
-                    <th style={{ textAlign: "left", paddingBottom: 4 }}>Début</th>
-                    <th style={{ textAlign: "left", paddingBottom: 4 }}>Fin</th>
-                    <th style={{ textAlign: "left", paddingBottom: 4 }}>Statut</th>
-                    <th style={{ textAlign: "left", paddingBottom: 4 }}>
-                      Commentaire admin
-                    </th>
-                    <th style={{ textAlign: "left", paddingBottom: 4 }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {myRequests.map((req) => (
-                    <tr key={req.$id}>
-                      <td style={{ padding: "2px 0" }}>
-                        {formatDateFr(req.dateDebut)}
-                      </td>
-                      <td style={{ padding: "2px 0" }}>
-                        {formatDateFr(req.dateFin)}
-                      </td>
-                      <td style={{ padding: "2px 0" }}>
-                        <span
-                          style={{
-                            padding: "2px 8px",
-                            borderRadius: 999,
-                            backgroundColor:
-                              req.statut === "en attente"
-                                ? "#fde68a"
-                                : req.statut === "validé"
-                                ? "#bbf7d0"
-                                : "#fecaca",
-                            border: "1px solid #e5e7eb",
-                          }}
-                        >
-                          {req.statut}
-                        </span>
-                      </td>
-                      <td style={{ padding: "2px 0", maxWidth: 220 }}>
-                        {req.commentaireAdmin ? (
-                          req.commentaireAdmin
-                        ) : (
-                          <span style={{ opacity: 0.6 }}>—</span>
-                        )}
-                      </td>
-                      <td style={{ padding: "2px 0" }}>
-                        {req.statut === "en attente" && (
-                          <button
-                            type="button"
-                            onClick={() => startEdit(req)}
+                {editingId
+                  ? "Modifier une demande de congé"
+                  : "Faire une nouvelle demande"}
+              </h2>
+
+              <form onSubmit={handleSubmit}>
+                <div style={{ marginBottom: "1rem" }}>
+                  <label
+                    htmlFor="dateDebut"
+                    style={{
+                      display: "block",
+                      fontWeight: "500",
+                      marginBottom: "0.25rem",
+                    }}
+                  >
+                    Date de début
+                  </label>
+                  <input
+                    id="dateDebut"
+                    type="date"
+                    value={dateDebut}
+                    onChange={(e) => setDateDebut(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "0.5rem",
+                      borderRadius: "0.375rem",
+                      border: "1px solid d1d5db",
+                    }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: "1rem" }}>
+                  <label
+                    htmlFor="dateFin"
+                    style={{
+                      display: "block",
+                      fontWeight: "500",
+                      marginBottom: "0.25rem",
+                    }}
+                  >
+                    Date de fin
+                  </label>
+                  <input
+                    id="dateFin"
+                    type="date"
+                    value={dateFin}
+                    onChange={(e) => setDateFin(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "0.5rem",
+                      borderRadius: "0.375rem",
+                      border: "1px solid d1d5db",
+                    }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: "1.5rem" }}>
+                  <label
+                    htmlFor="commentaire"
+                    style={{
+                      display: "block",
+                      fontWeight: "500",
+                      marginBottom: "0.25rem",
+                    }}
+                  >
+                    Commentaire (optionnel)
+                  </label>
+                  <textarea
+                    id="commentaire"
+                    rows={3}
+                    value={commentaire}
+                    onChange={(e) => setCommentaire(e.target.value)}
+                    placeholder="Ex : congés payés, récupération, raison..."
+                    style={{
+                      width: "100%",
+                      padding: "0.5rem",
+                      borderRadius: "0.375rem",
+                      border: "1px solid d1d5db",
+                      resize: "vertical",
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    style={{
+                      flex: 1,
+                      padding: "0.75rem",
+                      borderRadius: "0.5rem",
+                      border: "none",
+                      backgroundColor: loading ? "#9ca3af" : "#2563eb",
+                      color: "#fff",
+                      fontWeight: "600",
+                      cursor: loading ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    {loading
+                      ? "Envoi en cours..."
+                      : editingId
+                      ? "Enregistrer les modifications"
+                      : "Envoyer la demande"}
+                  </button>
+
+                  {editingId && (
+                    <button
+                      type="button"
+                      onClick={cancelEdit}
+                      style={{
+                        padding: "0.75rem",
+                        borderRadius: "0.5rem",
+                        border: "1px solid #d1d5db",
+                        backgroundColor: "#f3f4f6",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Annuler
+                    </button>
+                  )}
+                </div>
+              </form>
+            </>
+          )}
+
+          {/* ONGLET : REPONSES */}
+          {activeTab === "responses" && (
+            <div style={{ marginTop: "0.5rem" }}>
+              <h2
+                style={{
+                  fontSize: "1.05rem",
+                  fontWeight: "600",
+                  marginBottom: "0.75rem",
+                }}
+              >
+                Mes demandes de congé
+              </h2>
+
+              {loadingRequests ? (
+                <p style={{ fontStyle: "italic", opacity: 0.7 }}>
+                  Chargement…
+                </p>
+              ) : myRequests.length === 0 ? (
+                <p style={{ fontStyle: "italic", opacity: 0.7 }}>
+                  Aucune demande enregistrée pour l’instant.
+                </p>
+              ) : (
+                <table
+                  style={{
+                    width: "100%",
+                    borderCollapse: "collapse",
+                    fontSize: "0.9rem",
+                  }}
+                >
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: "left", paddingBottom: 4 }}>
+                        Début
+                      </th>
+                      <th style={{ textAlign: "left", paddingBottom: 4 }}>
+                        Fin
+                      </th>
+                      <th style={{ textAlign: "left", paddingBottom: 4 }}>
+                        Statut
+                      </th>
+                      <th style={{ textAlign: "left", paddingBottom: 4 }}>
+                        Commentaire admin
+                      </th>
+                      <th style={{ textAlign: "left", paddingBottom: 4 }}>
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {myRequests.map((req) => (
+                      <tr key={req.$id}>
+                        <td style={{ padding: "2px 0" }}>
+                          {formatDateFr(req.dateDebut)}
+                        </td>
+                        <td style={{ padding: "2px 0" }}>
+                          {formatDateFr(req.dateFin)}
+                        </td>
+                        <td style={{ padding: "2px 0" }}>
+                          <span
                             style={{
                               padding: "2px 8px",
-                              borderRadius: "0.375rem",
-                              border: "1px solid #d1d5db",
-                              backgroundColor: "#e5e7eb",
-                              cursor: "pointer",
-                              fontSize: "0.8rem",
+                              borderRadius: 999,
+                              backgroundColor:
+                                req.statut === "en attente"
+                                  ? "#fde68a"
+                                  : req.statut === "validé"
+                                  ? "#bbf7d0"
+                                  : "#fecaca",
+                              border: "1px solid #e5e7eb",
                             }}
                           >
-                            Modifier
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+                            {req.statut}
+                          </span>
+                        </td>
+                        <td style={{ padding: "2px 0", maxWidth: 220 }}>
+                          {req.commentaireAdmin ? (
+                            req.commentaireAdmin
+                          ) : (
+                            <span style={{ opacity: 0.6 }}>—</span>
+                          )}
+                        </td>
+                        <td style={{ padding: "2px 0" }}>
+                          {req.statut === "en attente" ? (
+                            <button
+                              type="button"
+                              onClick={() => startEdit(req)}
+                              style={{
+                                padding: "2px 8px",
+                                borderRadius: "0.375rem",
+                                border: "1px solid #d1d5db",
+                                backgroundColor: "#e5e7eb",
+                                cursor: "pointer",
+                                fontSize: "0.8rem",
+                              }}
+                            >
+                              Modifier
+                            </button>
+                          ) : req.vuUser ? (
+                            <span
+                              style={{
+                                fontSize: "0.8rem",
+                                opacity: 0.7,
+                              }}
+                            >
+                              Vu
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => markSeen(req.$id)}
+                              style={{
+                                padding: "2px 8px",
+                                borderRadius: "0.375rem",
+                                border: "1px solid #d1d5db",
+                                backgroundColor: "#e5e7eb",
+                                cursor: "pointer",
+                                fontSize: "0.8rem",
+                              }}
+                            >
+                              Vue
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
