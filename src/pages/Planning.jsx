@@ -228,33 +228,36 @@ export default function Planning() {
   }
 
   // === CONTENU CELLULE ===
-  function renderCellContent(cell) {
-    if (!cell) return "—";
+function renderCellContent(cell, showTitle = true) {
+  if (!cell) return "—";
 
-    return (
-      <div style={{ fontSize: "12px" }}>
+  return (
+    <div style={{ fontSize: "12px" }}>
+      {showTitle && (
         <div style={{ fontWeight: "bold" }}>{cell.valeur || "—"}</div>
+      )}
 
-        {cell.petit && (
-          <div>
-            🚐 <span style={{ fontSize: "11px" }}>Petit déplacement</span>
-          </div>
-        )}
+      {cell.petit && (
+        <div>
+          🚐 <span style={{ fontSize: "11px" }}>Petit déplacement</span>
+        </div>
+      )}
 
-        {cell.grand && (
-          <div>
-            🧳 <span style={{ fontSize: "11px" }}>Grand déplacement</span>
-          </div>
-        )}
+      {cell.grand && (
+        <div>
+          🧳 <span style={{ fontSize: "11px" }}>Grand déplacement</span>
+        </div>
+      )}
 
-        {cell.nuit && (
-          <div>
-            🌙 <span style={{ fontSize: "11px" }}>Nuit ({cell.heuresNuit}h)</span>
-          </div>
-        )}
-      </div>
-    );
-  }
+      {cell.nuit && (
+        <div>
+          🌙 <span style={{ fontSize: "11px" }}>Nuit ({cell.heuresNuit}h)</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 
   // === MENU RAPIDE / MODALE SUPPLÉMENT ===
   function openQuickMenu(e, date, techId) {
@@ -367,7 +370,7 @@ export default function Planning() {
                           onClick={(e) => openQuickMenu(e, dateStr, t.$id)}
                           onContextMenu={(e) => openModal(e, dateStr, t.$id)}
                         >
-                          {renderCellContent(cell)}
+                          {renderCellContent(cell, true)}
                         </td>
                       );
                     })}
@@ -495,7 +498,7 @@ export default function Planning() {
                         ))}
                       </select>
 
-                      {renderCellContent(cell)}
+                      {renderCellContent(cell, false)}
                     </td>
                   );
                 })}
