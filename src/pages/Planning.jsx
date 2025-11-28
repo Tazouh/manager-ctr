@@ -550,7 +550,7 @@ export default function Planning() {
           style={{
             position: "absolute",
             top: 100,
-            right: 100,
+            right: 30,
             padding: "8px 14px",
             background: "rgba(255,255,255,0.85)",
             borderRadius: "6px",
