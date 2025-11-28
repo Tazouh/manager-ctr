@@ -5,6 +5,10 @@ import { account } from "./appwrite";
 import Login from "./pages/Login.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import Planning from "./pages/Planning.jsx";
+import Inventaire from "./pages/Inventaire.jsx";
+import Conges from "./pages/Conges.jsx";
+import Chat from "./pages/Chat.jsx";
+import Gestion from "./pages/Gestion.jsx";   // 👈 AJOUT
 
 function App() {
   const [loading, setLoading] = useState(true);
@@ -44,7 +48,6 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-
         {/* ---- PAGE LOGIN ---- */}
         {!isAuthenticated && (
           <Route
@@ -66,10 +69,15 @@ function App() {
               element={<Dashboard onLogout={() => setIsAuthenticated(false)} />}
             />
 
-            <Route
-              path="/planning"
-              element={<Planning />}
-            />
+            <Route path="/planning" element={<Planning />} />
+
+            <Route path="/inventaire" element={<Inventaire />} />
+
+            <Route path="/conges" element={<Conges />} />
+
+            <Route path="/chat" element={<Chat />} />
+
+            <Route path="/gestion" element={<Gestion />} /> {/* 👈 AJOUT */}
           </>
         )}
 

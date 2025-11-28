@@ -1,6 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { account } from "../appwrite";
+import { account, databases } from "../appwrite";
+
+// 🔧 Appwrite
+const DB_ID = "692950f300288c67303a";
+const CONGES_COL = "conges";
 
 const backgroundStyle = {
   minHeight: "100vh",
@@ -76,7 +80,68 @@ const itemStyle = {
 
 export default function Dashboard({ onLogout }) {
   const [open, setOpen] = useState(false);
+
+  // admin / gestion
+  const [pendingCongesCount, setPendingCongesCount] = useState(0);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // notif pour l’utilisateur sur "Demande de congé"
+  const [congesNotifCount, setCongesNotifCount] = useState(0);
+  const [currentUser, setCurrentUser] = useState(null);
+
   const navigate = useNavigate();
+
+  // ---------- Fonctions de chargement ----------
+  // nb de congés "en attente" (pour l'onglet Gestion, admin uniquement)
+  const fetchPendingConges = async () => {
+    try {
+      const res = await databases.listDocuments(DB_ID, CONGES_COL);
+      const pending = res.documents.filter(
+        (doc) => doc.statut === "en attente"
+      ).length;
+      setPendingCongesCount(pending);
+    } catch (err) {
+      console.error("Erreur chargement congés (pending) :", err);
+    }
+  };
+
+  // nb de congés de l'utilisateur dont le statut n'est plus "en attente"
+  const fetchUserCongesNotif = async (userId) => {
+    try {
+      const res = await databases.listDocuments(DB_ID, CONGES_COL);
+      const mineProcessed = res.documents.filter(
+        (doc) => doc.userId === userId && doc.statut !== "en attente"
+      );
+      setCongesNotifCount(mineProcessed.length);
+    } catch (err) {
+      console.error("Erreur chargement congés (notif user) :", err);
+    }
+  };
+
+  // ---------- Init au montage ----------
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const user = await account.get();
+        setCurrentUser(user);
+
+        const labels = user.labels || [];
+        const adminFlag =
+          Array.isArray(labels) && labels.includes("admin");
+        setIsAdmin(adminFlag);
+
+        if (adminFlag) {
+          await fetchPendingConges();
+        }
+
+        await fetchUserCongesNotif(user.$id);
+      } catch (err) {
+        console.error("Erreur chargement utilisateur/dashboard :", err);
+      }
+    };
+
+    init();
+  }, []);
 
   const handleItemClick = (label) => {
     console.log("Menu choisi :", label);
@@ -85,6 +150,9 @@ export default function Dashboard({ onLogout }) {
     if (label === "Planning") navigate("/planning");
     if (label === "Suivi travaux") navigate("/suivi");
     if (label === "Commande") navigate("/commande");
+    if (label === "Inventaire") navigate("/inventaire");
+    if (label === "Demande de congé") navigate("/conges");
+    if (label === "Chat") navigate("/chat");
     if (label === "Gestion") navigate("/gestion");
   };
 
@@ -103,7 +171,13 @@ export default function Dashboard({ onLogout }) {
 
       <div style={wrapperStyle}>
         <div style={cardStyle}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1rem" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              marginBottom: "1rem",
+            }}
+          >
             <h1 style={titleStyle}>Dashboard CTR</h1>
 
             <button
@@ -128,7 +202,18 @@ export default function Dashboard({ onLogout }) {
             <button
               type="button"
               style={menuButtonStyle}
-              onClick={() => setOpen((o) => !o)}
+              onClick={async () => {
+                const newOpen = !open;
+                setOpen(newOpen);
+
+                // refresh des compteurs quand on ouvre le menu
+                if (newOpen && currentUser) {
+                  if (isAdmin) {
+                    fetchPendingConges();
+                  }
+                  fetchUserCongesNotif(currentUser.$id);
+                }
+              }}
             >
               Menu ▾
             </button>
@@ -138,18 +223,84 @@ export default function Dashboard({ onLogout }) {
                 <li style={itemStyle} onClick={() => handleItemClick("Planning")}>
                   Planning
                 </li>
-                <li style={itemStyle} onClick={() => handleItemClick("Suivi travaux")}>
+
+                <li
+                  style={itemStyle}
+                  onClick={() => handleItemClick("Suivi travaux")}
+                >
                   Suivi travaux
                 </li>
+
                 <li style={itemStyle} onClick={() => handleItemClick("Commande")}>
                   Commande
                 </li>
+
                 <li
-                  style={{ ...itemStyle, borderBottom: "none" }}
-                  onClick={() => handleItemClick("Gestion")}
+                  style={itemStyle}
+                  onClick={() => handleItemClick("Inventaire")}
                 >
-                  Gestion
+                  Inventaire
                 </li>
+
+                {/* Demande de congé + bulle pour l'utilisateur */}
+                <li
+                  style={itemStyle}
+                  onClick={() => handleItemClick("Demande de congé")}
+                >
+                  <span style={{ marginRight: 8 }}>Demande de congé</span>
+                  {congesNotifCount > 0 && (
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        minWidth: 20,
+                        height: 20,
+                        padding: "0 6px",
+                        borderRadius: 999,
+                        backgroundColor: "#2563eb",
+                        color: "#fff",
+                        fontSize: "0.75rem",
+                        fontWeight: "600",
+                      }}
+                    >
+                      {congesNotifCount}
+                    </span>
+                  )}
+                </li>
+
+                <li style={itemStyle} onClick={() => handleItemClick("Chat")}>
+                  Chat
+                </li>
+
+                {/* Gestion visible uniquement pour admin */}
+                {isAdmin && (
+                  <li
+                    style={{ ...itemStyle, borderBottom: "none" }}
+                    onClick={() => handleItemClick("Gestion")}
+                  >
+                    <span style={{ marginRight: 8 }}>Gestion</span>
+                    {pendingCongesCount > 0 && (
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          minWidth: 20,
+                          height: 20,
+                          padding: "0 6px",
+                          borderRadius: 999,
+                          backgroundColor: "#ef4444",
+                          color: "#fff",
+                          fontSize: "0.75rem",
+                          fontWeight: "600",
+                        }}
+                      >
+                        {pendingCongesCount}
+                      </span>
+                    )}
+                  </li>
+                )}
               </ul>
             )}
           </div>

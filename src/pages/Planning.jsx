@@ -3,6 +3,7 @@ import { databases, ID } from "../appwrite";
 import { useNavigate } from "react-router-dom";
 import AddTechnicienModal from "../components/AddTechnicienModal";
 import AddChantierModal from "../components/AddChantierModal";
+import * as XLSX from "xlsx";
 
 // === Appwrite IDs ===
 const DB_ID = "692950f300288c67303a"; // ID de ta base planningCTR
@@ -51,7 +52,7 @@ export default function Planning() {
   const [chantiers, setChantiers] = useState([]);
   const [planning, setPlanning] = useState({});
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState("week"); // 👈 Vue par défaut = hebdo
+  const [viewMode, setViewMode] = useState("week"); // Vue par défaut = hebdo
 
   const [showTechModal, setShowTechModal] = useState(false);
   const [showChantierModal, setShowChantierModal] = useState(false);
@@ -228,36 +229,35 @@ export default function Planning() {
   }
 
   // === CONTENU CELLULE ===
-function renderCellContent(cell, showTitle = true) {
-  if (!cell) return "—";
+  function renderCellContent(cell, showTitle = true) {
+    if (!cell) return "—";
 
-  return (
-    <div style={{ fontSize: "12px" }}>
-      {showTitle && (
-        <div style={{ fontWeight: "bold" }}>{cell.valeur || "—"}</div>
-      )}
+    return (
+      <div style={{ fontSize: "12px" }}>
+        {showTitle && (
+          <div style={{ fontWeight: "bold" }}>{cell.valeur || "—"}</div>
+        )}
 
-      {cell.petit && (
-        <div>
-          🚐 <span style={{ fontSize: "11px" }}>Petit déplacement</span>
-        </div>
-      )}
+        {cell.petit && (
+          <div>
+            🚐 <span style={{ fontSize: "11px" }}>Petit déplacement</span>
+          </div>
+        )}
 
-      {cell.grand && (
-        <div>
-          🧳 <span style={{ fontSize: "11px" }}>Grand déplacement</span>
-        </div>
-      )}
+        {cell.grand && (
+          <div>
+            🧳 <span style={{ fontSize: "11px" }}>Grand déplacement</span>
+          </div>
+        )}
 
-      {cell.nuit && (
-        <div>
-          🌙 <span style={{ fontSize: "11px" }}>Nuit ({cell.heuresNuit}h)</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
+        {cell.nuit && (
+          <div>
+            🌙 <span style={{ fontSize: "11px" }}>Nuit ({cell.heuresNuit}h)</span>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   // === MENU RAPIDE / MODALE SUPPLÉMENT ===
   function openQuickMenu(e, date, techId) {
@@ -286,6 +286,77 @@ function renderCellContent(cell, showTitle = true) {
       secteur: cell.secteur || "",
       id: cell.$id || null,
     });
+  }
+
+  // === EXPORT EXCEL ===
+  function exportToExcel() {
+    const days =
+      viewMode === "month" ? getMonthDays(currentDate) : getWeekDays(currentDate);
+
+    // Ligne d'en-tête
+    const header = [
+      "Technicien",
+      ...days.map((d) =>
+        d.toLocaleDateString("fr-FR", {
+          weekday: "short",
+          day: "2-digit",
+          month: "2-digit",
+        })
+      ),
+    ];
+
+    const data = [header];
+
+    techniciens.forEach((t) => {
+      const row = [t.nom];
+
+      days.forEach((d) => {
+        const dateStr = ymd(d);
+        const key = `${dateStr}-${t.$id}`;
+        const cell = planning[key];
+
+        if (!cell) {
+          row.push("");
+        } else {
+          const parts = [];
+          if (cell.valeur) parts.push(cell.valeur);
+          if (cell.petit) parts.push("Petit déplacement");
+          if (cell.grand) parts.push("Grand déplacement");
+          if (cell.nuit) parts.push(`Nuit (${cell.heuresNuit || 0}h)`);
+          if (cell.secteur) parts.push(`Secteur: ${cell.secteur}`);
+          row.push(parts.join(" | "));
+        }
+      });
+
+      data.push(row);
+    });
+
+    if (data.length === 1) {
+      alert("Aucune donnée à exporter.");
+      return;
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(
+      wb,
+      ws,
+      viewMode === "week" ? "Semaine" : "Mois"
+    );
+
+    const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([wbout], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const label = viewMode === "week" ? "semaine" : "mois";
+    a.href = url;
+    a.download = `planning_${label}_${ymd(currentDate)}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 
   // === RENDU VUE MENSUELLE ===
@@ -547,13 +618,13 @@ function renderCellContent(cell, showTitle = true) {
           boxShadow: "0 10px 25px rgba(0,0,0,0.25)",
         }}
       >
-        {/* Bouton retour Dashboard - un peu descendu */}
+        {/* Bouton retour Dashboard - descendu */}
         <button
           onClick={() => navigate("/dashboard")}
           style={{
             position: "absolute",
-            top: 100,
-            right: 30,
+            top: 110,
+            right: 20,
             padding: "8px 14px",
             background: "rgba(255,255,255,0.85)",
             borderRadius: "6px",
@@ -563,7 +634,7 @@ function renderCellContent(cell, showTitle = true) {
           Retour
         </button>
 
-        {/* BOUTONS DE VUE + AJOUT */}
+        {/* BOUTONS DE VUE + AJOUT + EXPORT */}
         <div
           style={{
             display: "flex",
@@ -574,6 +645,8 @@ function renderCellContent(cell, showTitle = true) {
         >
           <button onClick={() => setViewMode("month")}>Vue mensuelle</button>
           <button onClick={() => setViewMode("week")}>Vue hebdomadaire</button>
+
+          <button onClick={exportToExcel}>Export Excel</button>
 
           <button
             onClick={() => setShowTechModal(true)}
