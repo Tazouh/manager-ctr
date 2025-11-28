@@ -1,4 +1,9 @@
-import React, { useEffect, useState, useMemo } from "react";
+// --- SuiviTravaux.jsx ---
+// VERSION PC + VERSION MOBILE WIZARD
+// Appwrite + Auto code/prix/total + Responsive
+// ---------------------------------------------
+
+import React, { useEffect, useState } from "react";
 import { account, databases, ID } from "../appwrite";
 import * as XLSX from "xlsx";
 import { useNavigate } from "react-router-dom";
@@ -6,7 +11,6 @@ import { useNavigate } from "react-router-dom";
 const DB_ID = "692950f300288c67303a";
 const COLLECTION = "suivi_de_travaux";
 
-// === Tarifs automatiques ===
 const tarifs = {
   "205-A": { travaux: "Tirage souterrain 0 à 288", prix: 1.05 },
   "205-B": { travaux: "Tirage souterrain 288 +", prix: 1.1 },
@@ -37,64 +41,50 @@ const tarifs = {
   "500-B": { travaux: "Aiguillage", prix: 0.4 },
 };
 
-// === Week ISO ===
 function weekNumber(d) {
   const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-  const day = date.getUTCDay() || 7;
-  date.setUTCDate(date.getUTCDate() + 4 - day);
-  const start = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
-  return Math.ceil(((date - start) / 86400000 + 1) / 7);
+  const dayNum = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  return Math.ceil(((date - yearStart) / 86400000 + 1) / 7);
 }
 
 export default function SuiviTravaux() {
   const navigate = useNavigate();
+  const isMobile = window.innerWidth < 768;
 
-  // STATES
   const [rows, setRows] = useState([]);
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
-  const [selectedWeek, setSelectedWeek] = useState(weekNumber(new Date()));
-  const [viewMode, setViewMode] = useState("mois");
-  const [filters, setFilters] = useState({});
+  const [step, setStep] = useState(1);
+  const [form, setForm] = useState({
+    date: "",
+    travaux: "",
+    code: "",
+    quantite: "",
+    prix: "",
+    total: "",
+  });
 
-  // === LOAD DATA ===
-  async function loadRows() {
-    try {
-      const res = await databases.listDocuments(DB_ID, COLLECTION);
-      setRows(res.documents);
-    } catch (err) {
-      console.error("Erreur loadRows :", err);
-    }
-  }
-
+  // ------------------------------
+  // LOAD DATA
+  // ------------------------------
   useEffect(() => {
-    loadRows();
+    databases
+      .listDocuments(DB_ID, COLLECTION)
+      .then((res) => setRows(res.documents || []))
+      .catch((err) => console.error("Erreur loadRows:", err));
   }, []);
 
-  // === ADD ROW ===
-  async function addRow() {
-    const now = new Date();
-    const newRow = {
-      date: now.toISOString().split("T")[0],
-      semaine: weekNumber(now),
-      mois: now.getMonth() + 1,
-      description: "",
-      plaque: "",
-      travaux: "",
-      code: "",
-      quantite: 0,
-      prix: 0,
-      total: 0,
-    };
+  // ------------------------------
+  // NORMALISE NUMBER
+  // ------------------------------
+  const norm = (v) => {
+    if (v === undefined || v === null || v === "") return 0;
+    return Number(String(v).replace(",", "."));
+  };
 
-    try {
-      const doc = await databases.createDocument(DB_ID, COLLECTION, ID.unique(), newRow);
-      setRows((prev) => [...prev, doc]);
-    } catch (err) {
-      console.error("Erreur addRow :", err);
-    }
-  }
-
-  // === UPDATE CELL ===
+  // ------------------------------
+  // UPDATE CELL (VERSION PC)
+  // ------------------------------
   async function updateCell(id, key, value) {
     try {
       const base = rows.find((r) => r.$id === id);
@@ -108,9 +98,12 @@ export default function SuiviTravaux() {
         updated.mois = d.getMonth() + 1;
       }
 
-      if (key === "code" && tarifs[value]) {
-        updated.travaux = tarifs[value].travaux;
-        updated.prix = tarifs[value].prix;
+      if (key === "code") {
+        const t = tarifs[value];
+        if (t) {
+          updated.travaux = t.travaux;
+          updated.prix = t.prix;
+        }
       }
 
       if (key === "travaux") {
@@ -121,249 +114,413 @@ export default function SuiviTravaux() {
         }
       }
 
-      updated.total = (updated.quantite * updated.prix).toFixed(2);
+      updated.quantite = norm(updated.quantite);
+      updated.prix = norm(updated.prix);
+      updated.total = Number((updated.quantite * updated.prix).toFixed(2));
 
-      await databases.updateDocument(DB_ID, COLLECTION, id, updated);
-      loadRows();
-    } catch (err) {
-      console.error("Erreur updateCell :", err);
+      const {
+        $id,
+        $collectionId,
+        $databaseId,
+        $createdAt,
+        $updatedAt,
+        ...clean
+      } = updated;
+
+      await databases.updateDocument(DB_ID, COLLECTION, id, clean);
+
+      setRows((p) => p.map((r) => (r.$id === id ? updated : r)));
+    } catch (e) {
+      console.error("Erreur updateCell :", e);
     }
   }
 
-  // === DELETE ROW ===
-  async function deleteRow(id) {
-    if (!window.confirm("Supprimer cette ligne ?")) return;
+  // ------------------------------
+  // ADD ROW (PC)
+  // ------------------------------
+  async function addRow() {
+    try {
+      const now = new Date();
+      const row = {
+        date: now.toISOString().split("T")[0],
+        semaine: weekNumber(now),
+        mois: now.getMonth() + 1,
+        description: "",
+        plaque: "",
+        travaux: "",
+        code: "",
+        quantite: 0,
+        prix: 0,
+        total: 0,
+      };
 
+      const doc = await databases.createDocument(
+        DB_ID,
+        COLLECTION,
+        ID.unique(),
+        row
+      );
+
+      setRows((r) => [...r, doc]);
+    } catch (e) {
+      console.error("Erreur addRow :", e);
+    }
+  }
+
+  // ------------------------------
+  // DELETE
+  // ------------------------------
+  async function del(id) {
+    if (!window.confirm("Supprimer ?")) return;
     try {
       await databases.deleteDocument(DB_ID, COLLECTION, id);
-      setRows((prev) => prev.filter((r) => r.$id !== id));
-    } catch (err) {
-      console.error("Erreur deleteRow :", err);
+      setRows((r) => r.filter((x) => x.$id !== id));
+    } catch (e) {
+      console.error("Erreur delete:", e);
     }
   }
 
-  // === FILTERS ===
-  const monthRows = rows.filter((r) => r.mois === selectedMonth);
-
-  const filtered = useMemo(() => {
-    let data = [...monthRows];
-    if (viewMode === "semaine") data = data.filter((r) => r.semaine === selectedWeek);
-
-    Object.entries(filters).forEach(([key, val]) => {
-      if (val !== "ALL") data = data.filter((r) => r[key] === val);
-    });
-
-    return data;
-  }, [rows, selectedMonth, selectedWeek, viewMode, filters]);
-
-  // === EXPORT EXCEL ===
+  // ------------------------------
+  // EXPORT EXCEL
+  // ------------------------------
   function exportExcel() {
-    const ws = XLSX.utils.json_to_sheet(filtered);
+    const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Travaux");
-    XLSX.writeFile(wb, `SuiviTravaux_M${selectedMonth}.xlsx`);
+    XLSX.writeFile(wb, "SuiviTravaux.xlsx");
   }
 
-  // === UI ===
+  // ------------------------------
+  // MOBILE WIZARD : SAVE
+  // ------------------------------
+  async function saveMobile() {
+    try {
+      const d = new Date(form.date);
+
+      const payload = {
+        date: form.date,
+        semaine: weekNumber(d),
+        mois: d.getMonth() + 1,
+        travaux: form.travaux,
+        code: form.code,
+        quantite: norm(form.quantite),
+        prix: norm(form.prix),
+        total: Number((norm(form.quantite) * norm(form.prix)).toFixed(2)),
+      };
+
+      await databases.createDocument(DB_ID, COLLECTION, ID.unique(), payload);
+      alert("Travail enregistré !");
+      setStep(1);
+      setForm({
+        date: "",
+        travaux: "",
+        code: "",
+        quantite: "",
+        prix: "",
+        total: "",
+      });
+    } catch (e) {
+      console.error("Erreur saveMobile:", e);
+      alert("Erreur Appwrite");
+    }
+  }
+
+  // ------------------------------
+  // MOBILE VIEW
+  // ------------------------------
+  if (isMobile) {
+    return (
+      <div style={{ padding: 20, fontFamily: "Arial" }}>
+        <button onClick={() => navigate("/dashboard")}>⬅ Retour</button>
+        <h2>📱 Ajouter un travail</h2>
+
+        {step === 1 && (
+          <>
+            <h3>📅 Date</h3>
+            <input
+              type="date"
+              value={form.date}
+              onChange={(e) => setForm({ ...form, date: e.target.value })}
+              style={inp}
+            />
+            <button style={btn} onClick={() => setStep(2)}>Suivant ➡</button>
+          </>
+        )}
+
+        {step === 2 && (
+          <>
+            <h3>🛠️ Travaux</h3>
+            <select
+              value={form.travaux}
+              onChange={(e) => {
+                const t = Object.entries(tarifs).find(
+                  ([, x]) => x.travaux === e.target.value
+                );
+                if (t) {
+                  setForm({
+                    ...form,
+                    travaux: t[1].travaux,
+                    code: t[0],
+                    prix: t[1].prix,
+                  });
+                } else {
+                  setForm({ ...form, travaux: e.target.value });
+                }
+              }}
+              style={inp}
+            >
+              <option value="">Choisir...</option>
+              {Object.entries(tarifs).map(([code, info]) => (
+                <option key={code} value={info.travaux}>
+                  {info.travaux}
+                </option>
+              ))}
+            </select>
+            <button style={btn} onClick={() => setStep(3)}>Suivant ➡</button>
+          </>
+        )}
+
+        {step === 3 && (
+          <>
+            <h3>🔢 Quantité</h3>
+            <input
+              type="number"
+              value={form.quantite}
+              onChange={(e) =>
+                setForm({ ...form, quantite: e.target.value, total: "" })
+              }
+              style={inp}
+            />
+
+            <h3>💶 Prix</h3>
+            <input
+              type="number"
+              step="0.01"
+              value={form.prix}
+              onChange={(e) => setForm({ ...form, prix: e.target.value })}
+              style={inp}
+            />
+
+            <h3>🧮 Total</h3>
+            <div style={{ fontSize: 24, marginBottom: 20 }}>
+              {(
+                norm(form.quantite) * norm(form.prix)
+              ).toFixed(2)}{" "}
+              €
+            </div>
+
+            <button style={btnGreen} onClick={saveMobile}>
+              ✅ Enregistrer
+            </button>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  // ------------------------------
+  // DESKTOP VIEW
+  // ------------------------------
   return (
     <div style={page}>
       <div style={card}>
-        
-        {/* HEADER */}
         <div style={header}>
-          <button style={btnGrey} onClick={() => navigate("/dashboard")}>← Retour</button>
+          <button style={btnGrey} onClick={() => navigate("/dashboard")}>
+            ← Retour
+          </button>
           <h2 style={title}>📋 Suivi de travaux</h2>
-          <button style={btnBlue} onClick={exportExcel}>💾 Export Excel</button>
+          <button style={btnBlue} onClick={exportExcel}>
+            💾 Export Excel
+          </button>
         </div>
 
-        {/* FILTRES */}
-        <div style={filtersRow}>
-          <select value={viewMode} onChange={(e) => setViewMode(e.target.value)} style={select}>
-            <option value="semaine">Vue Semaine</option>
-            <option value="mois">Vue Mois</option>
-          </select>
+        <table style={table}>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Semaine</th>
+              <th>Plaque</th>
+              <th>Travaux</th>
+              <th>Code</th>
+              <th>Quantité</th>
+              <th>Prix</th>
+              <th>Total</th>
+              <th></th>
+            </tr>
+          </thead>
 
-          {viewMode === "semaine" ? (
-            <input
-              type="number"
-              min={1}
-              max={53}
-              value={selectedWeek}
-              onChange={(e) => setSelectedWeek(parseInt(e.target.value))}
-              style={select}
-            />
-          ) : (
-            <select
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
-              style={select}
-            >
-              {Array.from({ length: 12 }, (_, i) => (
-                <option key={i + 1} value={i + 1}>Mois {i + 1}</option>
-              ))}
-            </select>
-          )}
-        </div>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.$id}>
+                <td>
+                  <input
+                    type="date"
+                    style={inp}
+                    value={r.date || ""}
+                    onChange={(e) => updateCell(r.$id, "date", e.target.value)}
+                  />
+                </td>
 
-        {/* TABLE */}
-        <div style={{ overflowX: "auto" }}>
-          <table style={table}>
-            <thead>
-              <tr style={theadRow}>
-                <th>Date</th>
-                <th>Semaine</th>
-                <th>Description</th>
-                <th>Plaque</th>
-                <th>Travaux</th>
-                <th>Code</th>
-                <th>Quantité</th>
-                <th>Prix</th>
-                <th>Total</th>
-                <th></th>
+                <td>{r.semaine}</td>
+
+                <td>
+                  <input
+                    style={inp}
+                    value={r.plaque || ""}
+                    onChange={(e) => updateCell(r.$id, "plaque", e.target.value)}
+                  />
+                </td>
+
+                <td>
+                  <select
+                    style={inp}
+                    value={r.travaux || ""}
+                    onChange={(e) =>
+                      updateCell(r.$id, "travaux", e.target.value)
+                    }
+                  >
+                    <option value="">—</option>
+                    {Object.entries(tarifs).map(([c, t]) => (
+                      <option key={c}>{t.travaux}</option>
+                    ))}
+                  </select>
+                </td>
+
+                <td>
+                  <input
+                    style={inp}
+                    value={r.code || ""}
+                    onChange={(e) => updateCell(r.$id, "code", e.target.value)}
+                  />
+                </td>
+
+                <td>
+                  <input
+                    type="number"
+                    style={inp}
+                    value={r.quantite}
+                    onChange={(e) =>
+                      updateCell(r.$id, "quantite", e.target.value)
+                    }
+                  />
+                </td>
+
+                <td>
+                  <input
+                    type="number"
+                    step="0.01"
+                    style={inp}
+                    value={r.prix}
+                    onChange={(e) => updateCell(r.$id, "prix", e.target.value)}
+                  />
+                </td>
+
+                <td>{Number(r.total).toFixed(2)} €</td>
+
+                <td>
+                  <button
+                    onClick={() => del(r.$id)}
+                    style={deleteBtn}
+                  >
+                    ❌
+                  </button>
+                </td>
               </tr>
-            </thead>
+            ))}
+          </tbody>
+        </table>
 
-            <tbody>
-              {filtered.map((r) => (
-                <tr key={r.$id} style={tbodyRow}>
-                  <td><input type="date" value={r.date} onChange={(e) => updateCell(r.$id, "date", e.target.value)} style={input}/></td>
-                  <td>{r.semaine}</td>
-                  <td><input value={r.description} onChange={(e) => updateCell(r.$id, "description", e.target.value)} style={input}/></td>
-                  <td><input value={r.plaque} onChange={(e) => updateCell(r.$id, "plaque", e.target.value)} style={input}/></td>
-                  <td>
-                    <select value={r.travaux} onChange={(e) => updateCell(r.$id, "travaux", e.target.value)} style={input}>
-                      <option value="">—</option>
-                      {Object.entries(tarifs).map(([c, info]) => (
-                        <option key={c} value={info.travaux}>{info.travaux}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td><input value={r.code} onChange={(e) => updateCell(r.$id, "code", e.target.value)} style={input}/></td>
-                  <td><input type="number" value={r.quantite} onChange={(e) => updateCell(r.$id, "quantite", parseFloat(e.target.value))} style={input}/></td>
-                  <td><input type="number" value={r.prix} onChange={(e) => updateCell(r.$id, "prix", parseFloat(e.target.value))} style={input}/></td>
-                  <td>{r.total} €</td>
-                  <td><button onClick={() => deleteRow(r.$id)} style={deleteBtn}>❌</button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <button style={btnGreen} onClick={addRow}>➕ Ajouter une ligne</button>
+        <button style={btnGreen} onClick={addRow}>
+          ➕ Ajouter une ligne
+        </button>
       </div>
     </div>
   );
 }
 
-/* === STYLES === */
-
+// ------------------------------
+// STYLES
+// ------------------------------
 const page = {
-  backgroundImage: "url('/Fond.png')",
-  backgroundSize: "cover",
+  background: "#f5f7fb",
   minHeight: "100vh",
-  padding: "30px 10px",
-  display: "flex",
-  justifyContent: "center",
+  padding: 20,
+  fontFamily: "Arial",
 };
 
 const card = {
-  width: "100%",
-  maxWidth: 1200,
-  background: "rgba(255,255,255,0.85)",
-  backdropFilter: "blur(10px)",
-  padding: 30,
-  borderRadius: 18,
-  boxShadow: "0 8px 25px rgba(0,0,0,0.15)",
+  background: "white",
+  padding: 20,
+  borderRadius: 12,
+  maxWidth: 1400,
+  margin: "0 auto",
+  boxShadow: "0 4px 15px rgba(0,0,0,0.1)",
 };
 
 const header = {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
-  marginBottom: 25,
+  marginBottom: 20,
 };
 
-const title = {
-  fontSize: 24,
-  fontWeight: "700",
-  color: "#1e40af",
+const title = { margin: 0, color: "#2563eb" };
+
+const table = {
+  width: "100%",
+  borderCollapse: "collapse",
+  marginBottom: 20,
+};
+
+const inp = {
+  width: "100%",
+  padding: "6px 8px",
+  borderRadius: 6,
+  border: "1px solid #cbd5e1",
 };
 
 const btnGrey = {
-  background: "#d1d5db",
-  border: "none",
   padding: "8px 14px",
-  borderRadius: 8,
-  fontWeight: 600,
+  borderRadius: 6,
+  border: "none",
+  background: "#e5e7eb",
   cursor: "pointer",
 };
 
 const btnBlue = {
+  padding: "8px 14px",
+  borderRadius: 6,
+  border: "none",
   background: "#2563eb",
   color: "white",
-  border: "none",
-  padding: "8px 14px",
-  borderRadius: 8,
-  fontWeight: 600,
   cursor: "pointer",
 };
 
+const btn = {
+  padding: 12,
+  width: "100%",
+  border: "none",
+  borderRadius: 8,
+  background: "#2563eb",
+  color: "white",
+  margin: "20px 0",
+  fontSize: 18,
+};
+
 const btnGreen = {
-  marginTop: 20,
+  padding: 12,
+  borderRadius: 8,
+  border: "none",
   background: "#10b981",
   color: "white",
-  border: "none",
-  padding: "12px 16px",
-  borderRadius: 10,
   fontWeight: "bold",
   cursor: "pointer",
   width: "100%",
 };
 
-const select = {
-  padding: "8px 10px",
-  borderRadius: 8,
-  border: "1px solid #cbd5e1",
-  fontSize: 14,
-};
-
-const filtersRow = {
-  display: "flex",
-  gap: 12,
-  marginBottom: 20,
-  flexWrap: "wrap",
-};
-
-const table = {
-  width: "100%",
-  borderCollapse: "collapse",
-  fontSize: 15,
-};
-
-const theadRow = {
-  background: "#eef2ff",
-  color: "#1e3a8a",
-  height: 45,
-};
-
-const tbodyRow = {
-  background: "white",
-  height: 50,
-  borderBottom: "1px solid #e5e7eb",
-};
-
-const input = {
-  width: "100%",
-  padding: "6px 8px",
-  borderRadius: 6,
-  border: "1px solid #cbd5e1",
-  fontSize: 14,
-};
-
 const deleteBtn = {
   background: "none",
   border: "none",
-  fontSize: 18,
+  color: "red",
   cursor: "pointer",
-  color: "#dc2626",
 };
