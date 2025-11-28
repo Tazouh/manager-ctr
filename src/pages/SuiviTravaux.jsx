@@ -1,9 +1,8 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { account, databases, ID, Query } from "../appwrite";
+import { account, databases, ID } from "../appwrite";
 import * as XLSX from "xlsx";
 import { useNavigate } from "react-router-dom";
 
-// === Appwrite ===
 const DB_ID = "692950f300288c67303a";
 const COLLECTION = "suivi_de_travaux";
 
@@ -38,7 +37,7 @@ const tarifs = {
   "500-B": { travaux: "Aiguillage", prix: 0.4 },
 };
 
-// === Calcule la semaine ISO ===
+// === Week ISO ===
 function weekNumber(d) {
   const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
   const day = date.getUTCDay() || 7;
@@ -50,13 +49,14 @@ function weekNumber(d) {
 export default function SuiviTravaux() {
   const navigate = useNavigate();
 
+  // STATES
   const [rows, setRows] = useState([]);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
-  const [viewMode, setViewMode] = useState("mois");
   const [selectedWeek, setSelectedWeek] = useState(weekNumber(new Date()));
+  const [viewMode, setViewMode] = useState("mois");
   const [filters, setFilters] = useState({});
 
-  // === Charger les données Appwrite ===
+  // === LOAD DATA ===
   async function loadRows() {
     try {
       const res = await databases.listDocuments(DB_ID, COLLECTION);
@@ -70,13 +70,11 @@ export default function SuiviTravaux() {
     loadRows();
   }, []);
 
-  // ============= Ajouter une ligne ============
+  // === ADD ROW ===
   async function addRow() {
     const now = new Date();
-    const dateStr = now.toISOString().split("T")[0];
-
     const newRow = {
-      date: dateStr,
+      date: now.toISOString().split("T")[0],
       semaine: weekNumber(now),
       mois: now.getMonth() + 1,
       description: "",
@@ -96,47 +94,43 @@ export default function SuiviTravaux() {
     }
   }
 
-  // ============= Mettre à jour Appwrite ============
+  // === UPDATE CELL ===
   async function updateCell(id, key, value) {
     try {
-      const updated = rows.find((r) => r.$id === id);
-      if (!updated) return;
+      const base = rows.find((r) => r.$id === id);
+      if (!base) return;
 
-      const draft = { ...updated, [key]: value };
+      const updated = { ...base, [key]: value };
 
       if (key === "date") {
         const d = new Date(value);
-        draft.semaine = weekNumber(d);
-        draft.mois = d.getMonth() + 1;
+        updated.semaine = weekNumber(d);
+        updated.mois = d.getMonth() + 1;
       }
 
-      if (key === "code") {
-        const info = tarifs[value];
-        if (info) {
-          draft.travaux = info.travaux;
-          draft.prix = info.prix;
-        }
+      if (key === "code" && tarifs[value]) {
+        updated.travaux = tarifs[value].travaux;
+        updated.prix = tarifs[value].prix;
       }
 
       if (key === "travaux") {
         const entry = Object.entries(tarifs).find(([, t]) => t.travaux === value);
         if (entry) {
-          draft.code = entry[0];
-          draft.prix = entry[1].prix;
+          updated.code = entry[0];
+          updated.prix = entry[1].prix;
         }
       }
 
-      draft.total = (draft.quantite * draft.prix).toFixed(2);
+      updated.total = (updated.quantite * updated.prix).toFixed(2);
 
-      await databases.updateDocument(DB_ID, COLLECTION, id, draft);
-
+      await databases.updateDocument(DB_ID, COLLECTION, id, updated);
       loadRows();
     } catch (err) {
       console.error("Erreur updateCell :", err);
     }
   }
 
-  // ============= Supprimer une ligne ============
+  // === DELETE ROW ===
   async function deleteRow(id) {
     if (!window.confirm("Supprimer cette ligne ?")) return;
 
@@ -148,67 +142,45 @@ export default function SuiviTravaux() {
     }
   }
 
-  // ==================== FILTRAGE ======================
+  // === FILTERS ===
   const monthRows = rows.filter((r) => r.mois === selectedMonth);
 
   const filtered = useMemo(() => {
     let data = [...monthRows];
-
-    if (viewMode === "semaine")
-      data = data.filter((r) => r.semaine === selectedWeek);
+    if (viewMode === "semaine") data = data.filter((r) => r.semaine === selectedWeek);
 
     Object.entries(filters).forEach(([key, val]) => {
-      if (val && val !== "ALL") data = data.filter((r) => r[key] === val);
+      if (val !== "ALL") data = data.filter((r) => r[key] === val);
     });
 
     return data;
   }, [rows, selectedMonth, selectedWeek, viewMode, filters]);
 
-  // ==================== EXPORT EXCEL =====================
+  // === EXPORT EXCEL ===
   function exportExcel() {
     const ws = XLSX.utils.json_to_sheet(filtered);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Travaux");
-    XLSX.writeFile(wb, `Suivi_Travaux_M${selectedMonth}.xlsx`);
+    XLSX.writeFile(wb, `SuiviTravaux_M${selectedMonth}.xlsx`);
   }
 
-  // ==================== RENDU =====================
+  // === UI ===
   return (
-    <div
-      style={{
-        backgroundImage: "url('/Fond.png')",
-        minHeight: "100vh",
-        padding: 20,
-      }}
-    >
-      <div
-        style={{
-          background: "rgba(255,255,255,0.9)",
-          backdropFilter: "blur(6px)",
-          padding: 20,
-          borderRadius: 12,
-          maxWidth: 1100,
-          margin: "0 auto",
-        }}
-      >
+    <div style={page}>
+      <div style={card}>
+        
         {/* HEADER */}
-        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
-          <button onClick={() => navigate("/dashboard")} style={btnGrey}>
-            ← Retour
-          </button>
-
-          <h2 style={{ margin: 0 }}>📋 Suivi de travaux</h2>
-
-          <button onClick={exportExcel} style={btnBlue}>
-            💾 Export Excel
-          </button>
+        <div style={header}>
+          <button style={btnGrey} onClick={() => navigate("/dashboard")}>← Retour</button>
+          <h2 style={title}>📋 Suivi de travaux</h2>
+          <button style={btnBlue} onClick={exportExcel}>💾 Export Excel</button>
         </div>
 
-        {/* Filtres */}
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
+        {/* FILTRES */}
+        <div style={filtersRow}>
           <select value={viewMode} onChange={(e) => setViewMode(e.target.value)} style={select}>
-            <option value="semaine">Vue semaine</option>
-            <option value="mois">Vue mois</option>
+            <option value="semaine">Vue Semaine</option>
+            <option value="mois">Vue Mois</option>
           </select>
 
           {viewMode === "semaine" ? (
@@ -227,128 +199,102 @@ export default function SuiviTravaux() {
               style={select}
             >
               {Array.from({ length: 12 }, (_, i) => (
-                <option key={i + 1} value={i + 1}>
-                  Mois {i + 1}
-                </option>
+                <option key={i + 1} value={i + 1}>Mois {i + 1}</option>
               ))}
             </select>
           )}
         </div>
 
-        {/* Tableau */}
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead>
-            <tr style={{ background: "#e5e7eb" }}>
-              <th>Date</th>
-              <th>Semaine</th>
-              <th>Description</th>
-              <th>Plaque</th>
-              <th>Travaux</th>
-              <th>Code</th>
-              <th>Quantité</th>
-              <th>Prix</th>
-              <th>Total</th>
-              <th></th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {filtered.map((r) => (
-              <tr key={r.$id}>
-                <td>
-                  <input
-                    type="date"
-                    value={r.date}
-                    onChange={(e) => updateCell(r.$id, "date", e.target.value)}
-                    style={input}
-                  />
-                </td>
-
-                <td>{r.semaine}</td>
-
-                <td>
-                  <input
-                    value={r.description}
-                    onChange={(e) => updateCell(r.$id, "description", e.target.value)}
-                    style={input}
-                  />
-                </td>
-
-                <td>
-                  <input
-                    value={r.plaque}
-                    onChange={(e) => updateCell(r.$id, "plaque", e.target.value)}
-                    style={input}
-                  />
-                </td>
-
-                <td>
-                  <select
-                    value={r.travaux}
-                    onChange={(e) => updateCell(r.$id, "travaux", e.target.value)}
-                    style={input}
-                  >
-                    <option value="">—</option>
-                    {Object.entries(tarifs).map(([code, info]) => (
-                      <option key={code} value={info.travaux}>
-                        {info.travaux}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-
-                <td>
-                  <input
-                    value={r.code}
-                    onChange={(e) => updateCell(r.$id, "code", e.target.value)}
-                    style={input}
-                  />
-                </td>
-
-                <td>
-                  <input
-                    type="number"
-                    value={r.quantite}
-                    onChange={(e) => updateCell(r.$id, "quantite", parseFloat(e.target.value))}
-                    style={input}
-                  />
-                </td>
-
-                <td>
-                  <input
-                    type="number"
-                    value={r.prix}
-                    onChange={(e) => updateCell(r.$id, "prix", parseFloat(e.target.value))}
-                    style={input}
-                  />
-                </td>
-
-                <td>{r.total} €</td>
-
-                <td>
-                  <button onClick={() => deleteRow(r.$id)} style={{ color: "red" }}>
-                    ❌
-                  </button>
-                </td>
+        {/* TABLE */}
+        <div style={{ overflowX: "auto" }}>
+          <table style={table}>
+            <thead>
+              <tr style={theadRow}>
+                <th>Date</th>
+                <th>Semaine</th>
+                <th>Description</th>
+                <th>Plaque</th>
+                <th>Travaux</th>
+                <th>Code</th>
+                <th>Quantité</th>
+                <th>Prix</th>
+                <th>Total</th>
+                <th></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
 
-        <button onClick={addRow} style={btnGreen}>
-          ➕ Ajouter une ligne
-        </button>
+            <tbody>
+              {filtered.map((r) => (
+                <tr key={r.$id} style={tbodyRow}>
+                  <td><input type="date" value={r.date} onChange={(e) => updateCell(r.$id, "date", e.target.value)} style={input}/></td>
+                  <td>{r.semaine}</td>
+                  <td><input value={r.description} onChange={(e) => updateCell(r.$id, "description", e.target.value)} style={input}/></td>
+                  <td><input value={r.plaque} onChange={(e) => updateCell(r.$id, "plaque", e.target.value)} style={input}/></td>
+                  <td>
+                    <select value={r.travaux} onChange={(e) => updateCell(r.$id, "travaux", e.target.value)} style={input}>
+                      <option value="">—</option>
+                      {Object.entries(tarifs).map(([c, info]) => (
+                        <option key={c} value={info.travaux}>{info.travaux}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td><input value={r.code} onChange={(e) => updateCell(r.$id, "code", e.target.value)} style={input}/></td>
+                  <td><input type="number" value={r.quantite} onChange={(e) => updateCell(r.$id, "quantite", parseFloat(e.target.value))} style={input}/></td>
+                  <td><input type="number" value={r.prix} onChange={(e) => updateCell(r.$id, "prix", parseFloat(e.target.value))} style={input}/></td>
+                  <td>{r.total} €</td>
+                  <td><button onClick={() => deleteRow(r.$id)} style={deleteBtn}>❌</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <button style={btnGreen} onClick={addRow}>➕ Ajouter une ligne</button>
       </div>
     </div>
   );
 }
 
-// === Styles ===
+/* === STYLES === */
+
+const page = {
+  backgroundImage: "url('/Fond.png')",
+  backgroundSize: "cover",
+  minHeight: "100vh",
+  padding: "30px 10px",
+  display: "flex",
+  justifyContent: "center",
+};
+
+const card = {
+  width: "100%",
+  maxWidth: 1200,
+  background: "rgba(255,255,255,0.85)",
+  backdropFilter: "blur(10px)",
+  padding: 30,
+  borderRadius: 18,
+  boxShadow: "0 8px 25px rgba(0,0,0,0.15)",
+};
+
+const header = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: 25,
+};
+
+const title = {
+  fontSize: 24,
+  fontWeight: "700",
+  color: "#1e40af",
+};
+
 const btnGrey = {
-  background: "#ccc",
+  background: "#d1d5db",
   border: "none",
   padding: "8px 14px",
-  borderRadius: 6,
+  borderRadius: 8,
+  fontWeight: 600,
   cursor: "pointer",
 };
 
@@ -357,7 +303,8 @@ const btnBlue = {
   color: "white",
   border: "none",
   padding: "8px 14px",
-  borderRadius: 6,
+  borderRadius: 8,
+  fontWeight: 600,
   cursor: "pointer",
 };
 
@@ -366,21 +313,57 @@ const btnGreen = {
   background: "#10b981",
   color: "white",
   border: "none",
-  padding: "10px 16px",
-  borderRadius: 6,
+  padding: "12px 16px",
+  borderRadius: 10,
+  fontWeight: "bold",
   cursor: "pointer",
   width: "100%",
 };
 
 const select = {
-  padding: "6px",
-  borderRadius: 6,
-  border: "1px solid #d1d5db",
+  padding: "8px 10px",
+  borderRadius: 8,
+  border: "1px solid #cbd5e1",
+  fontSize: 14,
+};
+
+const filtersRow = {
+  display: "flex",
+  gap: 12,
+  marginBottom: 20,
+  flexWrap: "wrap",
+};
+
+const table = {
+  width: "100%",
+  borderCollapse: "collapse",
+  fontSize: 15,
+};
+
+const theadRow = {
+  background: "#eef2ff",
+  color: "#1e3a8a",
+  height: 45,
+};
+
+const tbodyRow = {
+  background: "white",
+  height: 50,
+  borderBottom: "1px solid #e5e7eb",
 };
 
 const input = {
   width: "100%",
-  padding: "4px",
-  borderRadius: 4,
-  border: "1px solid #d1d5db",
+  padding: "6px 8px",
+  borderRadius: 6,
+  border: "1px solid #cbd5e1",
+  fontSize: 14,
+};
+
+const deleteBtn = {
+  background: "none",
+  border: "none",
+  fontSize: 18,
+  cursor: "pointer",
+  color: "#dc2626",
 };

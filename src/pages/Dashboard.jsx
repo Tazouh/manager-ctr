@@ -148,7 +148,7 @@ export default function Dashboard({ onLogout }) {
     setOpen(false);
 
     if (label === "Planning") navigate("/planning");
-    if (label === "Suivi travaux") navigate("/suivi");
+    if (label === "Suivi travaux") navigate("/suivi-travaux");
     if (label === "Commande") navigate("/commande");
     if (label === "Inventaire") navigate("/inventaire");
     if (label === "Demande de congé") navigate("/conges");
