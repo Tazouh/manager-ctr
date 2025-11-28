@@ -1,3 +1,4 @@
+import { Query, account } from "../appwrite";
 import React, { useEffect, useState } from "react";
 import { databases, ID } from "../appwrite";
 import { useNavigate } from "react-router-dom";
@@ -43,6 +44,7 @@ function getISOWeek(d) {
         7
     )
   );
+  
 }
 
 export default function Planning() {
@@ -63,13 +65,38 @@ export default function Planning() {
 
   const [showManageTech, setShowManageTech] = useState(false);
   const [showManageChantier, setShowManageChantier] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // === LOAD DATA ===
   useEffect(() => {
     loadTechniciens();
     loadChantiers();
     loadPlanning();
+    loadUserStatus();
   }, []);
+  async function loadUserStatus() {
+  try {
+    // Récupération du compte Appwrite
+    const userInfo = await account.get();
+    const userId = userInfo.$id;
+
+    // Recherche du technicien correspondant
+    const res = await databases.listDocuments(DB_ID, TECH_COL, [
+      Query.equal("userId", userId)
+    ]);
+
+    if (res.documents.length > 0) {
+      const userDoc = res.documents[0];
+      setIsAdmin(userDoc.statut === "admin");
+    } else {
+      console.warn("Utilisateur non trouvé dans techniciens");
+    }
+
+  } catch (err) {
+    console.error("Erreur chargement statut admin :", err);
+  }
+}
+
 
   async function loadTechniciens() {
     try {
@@ -878,6 +905,7 @@ return (
     Vue hebdomadaire
   </button>
 
+  {isAdmin && (
   <button
     onClick={exportToExcel}
     style={{
@@ -890,7 +918,10 @@ return (
   >
     Export Excel
   </button>
+)}
 
+
+  {isAdmin && (
   <button
     onClick={() => setShowTechModal(true)}
     style={{
@@ -904,7 +935,10 @@ return (
   >
     + Technicien
   </button>
+)}
 
+
+  {isAdmin && (
   <button
     onClick={() => setShowChantierModal(true)}
     style={{
@@ -917,6 +951,8 @@ return (
   >
     + Chantier
   </button>
+)}
+
 </div>
 
 
@@ -934,34 +970,39 @@ return (
       >
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span style={{ fontWeight: 700, fontSize: 15 }}>Techniciens</span>
-          <button
-            onClick={() => setShowManageTech(true)}
-            style={{
-              background: "#374151",
-              color: "white",
-              padding: "6px 10px",
-              borderRadius: 6,
-              fontWeight: 600,
-            }}
-          >
-            Modifier
-          </button>
+          {isAdmin && (
+  <button
+    onClick={() => setShowManageTech(true)}
+    style={{
+      background: "#374151",
+      color: "white",
+      padding: "6px 10px",
+      borderRadius: 6,
+      fontWeight: 600,
+    }}
+  >
+    Modifier
+  </button>
+)}
+
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span style={{ fontWeight: 700, fontSize: 15 }}>Chantiers</span>
-          <button
-            onClick={() => setShowManageChantier(true)}
-            style={{
-              background: "#374151",
-              color: "white",
-              padding: "6px 10px",
-              borderRadius: 6,
-              fontWeight: 600,
-            }}
-          >
-            Modifier
-          </button>
+          {isAdmin && (
+  <button
+    onClick={() => setShowManageChantier(true)}
+    style={{
+      background: "#374151",
+      color: "white",
+      padding: "6px 10px",
+      borderRadius: 6,
+      fontWeight: 600,
+    }}
+  >
+    Modifier
+  </button>
+)}
         </div>
       </div>
 
@@ -1368,17 +1409,20 @@ return (
             ))}
 
             <div style={{ textAlign: "right", marginTop: 10 }}>
-              <button
-                onClick={() => setShowManageChantier(false)}
-                style={{
-                  padding: "8px 14px",
-                  background: "#374151",
-                  color: "white",
-                  borderRadius: 8,
-                }}
-              >
-                Fermer
-              </button>
+              {isAdmin && (
+  <button
+    onClick={() => setShowManageChantier(true)}
+    style={{
+      background: "#374151",
+      color: "white",
+      padding: "6px 10px",
+      borderRadius: 6,
+      fontWeight: 600,
+    }}
+  >
+    Modifier
+  </button>
+)}
             </div>
           </div>
         </div>
