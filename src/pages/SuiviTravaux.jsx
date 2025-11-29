@@ -248,97 +248,98 @@ export default function SuiviTravaux() {
   //   MOBILE WIZARD
   // ============================================================================
   if (isMobile) {
-    return (
-      <div style={{ padding: 20, fontFamily: "Arial" }}>
-        <button onClick={() => navigate("/dashboard")}>⬅ Retour</button>
-        <h2>📱 Ajouter un travail</h2>
+  return (
+    <div style={{ padding: 20, fontFamily: "Arial" }}>
+      <button onClick={() => navigate("/dashboard")}>⬅ Retour</button>
+      <h2>📱 Ajouter un travail</h2>
 
-        {/* ÉTAPE 1 */}
-        {step === 1 && (
-          <>
-            <h3>📅 Date</h3>
-            <input
-              type="date"
-              value={form.date}
-              onChange={(e) => setForm({ ...form, date: e.target.value })}
-              style={inp}
-            />
-            <button style={btn} onClick={() => setStep(2)}>
-              Suivant ➡
-            </button>
-          </>
-        )}
+      {/* ÉTAPE 1 */}
+      {step === 1 && (
+        <>
+          <h3>📅 Date</h3>
+          <input
+            type="date"
+            value={form.date}
+            onChange={(e) => setForm({ ...form, date: e.target.value })}
+            style={inpMobile}
+          />
+          <button style={btnMobile} onClick={() => setStep(2)}>
+            Suivant ➡
+          </button>
+        </>
+      )}
 
-        {/* ÉTAPE 2 */}
-        {step === 2 && (
-          <>
-            <h3>🛠️ Travaux</h3>
-            <select
-              value={form.travaux}
-              onChange={(e) => {
-                const entry = Object.entries(tarifs).find(
-                  ([, t]) => t.travaux === e.target.value
-                );
-                if (entry) {
-                  setForm({
-                    ...form,
-                    travaux: entry[1].travaux,
-                    code: entry[0],
-                    prix: entry[1].prix,
-                  });
-                } else setForm({ ...form, travaux: e.target.value });
-              }}
-              style={inp}
-            >
-              <option value="">Choisir...</option>
-              {Object.entries(tarifs).map(([code, info]) => (
-                <option key={code} value={info.travaux}>
-                  {info.travaux}
-                </option>
-              ))}
-            </select>
+      {/* ÉTAPE 2 */}
+      {step === 2 && (
+        <>
+          <h3>🛠️ Travaux</h3>
+          <select
+            value={form.travaux}
+            onChange={(e) => {
+              const entry = Object.entries(tarifs).find(
+                ([, t]) => t.travaux === e.target.value
+              );
+              if (entry) {
+                setForm({
+                  ...form,
+                  travaux: entry[1].travaux,
+                  code: entry[0],
+                  prix: entry[1].prix,
+                });
+              } else setForm({ ...form, travaux: e.target.value });
+            }}
+            style={inpMobile}
+          >
+            <option value="">Choisir...</option>
+            {Object.entries(tarifs).map(([code, info]) => (
+              <option key={code} value={info.travaux}>
+                {info.travaux}
+              </option>
+            ))}
+          </select>
 
-            <button style={btn} onClick={() => setStep(3)}>
-              Suivant ➡
-            </button>
-          </>
-        )}
+          <button style={btnMobile} onClick={() => setStep(3)}>
+            Suivant ➡
+          </button>
+        </>
+      )}
 
-        {/* ÉTAPE 3 */}
-        {step === 3 && (
-          <>
-            <h3>🔢 Quantité</h3>
-            <input
-              type="number"
-              value={form.quantite}
-              onChange={(e) =>
-                setForm({ ...form, quantite: e.target.value, total: "" })
-              }
-              style={inp}
-            />
+      {/* ÉTAPE 3 */}
+      {step === 3 && (
+        <>
+          <h3>🔢 Quantité</h3>
+          <input
+            type="number"
+            value={form.quantite}
+            onChange={(e) =>
+              setForm({ ...form, quantite: e.target.value, total: "" })
+            }
+            style={inpMobile}
+          />
 
-            <h3>💶 Prix</h3>
-            <input
-              type="number"
-              step="0.01"
-              value={form.prix}
-              onChange={(e) => setForm({ ...form, prix: e.target.value })}
-              style={inp}
-            />
+          <h3>💶 Prix</h3>
+          <input
+            type="number"
+            step="0.01"
+            value={form.prix}
+            onChange={(e) => setForm({ ...form, prix: e.target.value })}
+            style={inpMobile}
+          />
 
-            <h3>🧮 Total</h3>
-            <div style={{ fontSize: 24, marginBottom: 20 }}>
-              {(norm(form.quantite) * norm(form.prix)).toFixed(2)} €
-            </div>
+          <h3>🧮 Total</h3>
+          <div style={{ fontSize: 24, marginBottom: 20 }}>
+            {(norm(form.quantite) * norm(form.prix)).toFixed(2)} €
+          </div>
 
-            <button style={btnGreen} onClick={saveMobile}>
-              ✅ Enregistrer
-            </button>
-          </>
-        )}
-      </div>
-    );
-  }
+          <button style={btnGreenMobile} onClick={saveMobile}>
+            ✅ Enregistrer
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 
   // ============================================================================
   //   DESKTOP VERSION
