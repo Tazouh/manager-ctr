@@ -646,3 +646,39 @@ const deleteBtn = {
   cursor: "pointer",
   fontSize: 20,
 };
+// ------------------------------
+// STYLES MOBILE (NOUVEAUX NOMS)
+// ------------------------------
+
+const inpMobile = {
+  width: "100%",
+  padding: "12px",
+  borderRadius: 8,
+  border: "1px solid #ccc",
+  fontSize: 16,
+  marginBottom: 20,
+};
+
+const btnMobile = {
+  padding: "12px",
+  background: "#2563eb",
+  color: "white",
+  border: "none",
+  borderRadius: 8,
+  width: "100%",
+  marginTop: 10,
+  fontSize: 18,
+  fontWeight: "bold",
+};
+
+const btnGreenMobile = {
+  padding: "14px",
+  background: "#10b981",
+  color: "white",
+  border: "none",
+  borderRadius: 8,
+  width: "100%",
+  fontSize: 18,
+  fontWeight: "bold",
+};
+
