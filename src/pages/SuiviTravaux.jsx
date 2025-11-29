@@ -11,6 +11,9 @@ import { useNavigate } from "react-router-dom";
 const DB_ID = "692950f300288c67303a";
 const COLLECTION = "suivi_de_travaux";
 
+// ------------------------------
+// TARIFS
+// ------------------------------
 const tarifs = {
   "205-A": { travaux: "Tirage souterrain 0 à 288", prix: 1.05 },
   "205-B": { travaux: "Tirage souterrain 288 +", prix: 1.1 },
@@ -41,6 +44,9 @@ const tarifs = {
   "500-B": { travaux: "Aiguillage", prix: 0.4 },
 };
 
+// ------------------------------
+// SEMAINE DU MOIS
+// ------------------------------
 function weekNumber(d) {
   const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
   const dayNum = date.getUTCDay() || 7;
@@ -49,16 +55,29 @@ function weekNumber(d) {
   return Math.ceil(((date - yearStart) / 86400000 + 1) / 7);
 }
 
+// ============================================================================
+//   COMPONENT
+// ============================================================================
 export default function SuiviTravaux() {
   const navigate = useNavigate();
-  const isMobile = window.innerWidth < 768;
 
-  // 🔵 MOIS + ANNÉE
+  // 🔥 Mobile detection FIX
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
+  // ------------------------------
+  // STATE
+  // ------------------------------
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-
   const [rows, setRows] = useState([]);
   const [step, setStep] = useState(1);
+
   const [form, setForm] = useState({
     date: "",
     travaux: "",
@@ -68,7 +87,9 @@ export default function SuiviTravaux() {
     total: "",
   });
 
+  // ------------------------------
   // LOAD DATA
+  // ------------------------------
   useEffect(() => {
     databases
       .listDocuments(DB_ID, COLLECTION)
@@ -76,11 +97,12 @@ export default function SuiviTravaux() {
       .catch((err) => console.error("Erreur loadRows:", err));
   }, []);
 
-  const norm = (v) => {
-    if (!v) return 0;
-    return Number(String(v).replace(",", "."));
-  };
+  // Convertit virgule → point
+  const norm = (v) => Number(String(v || 0).replace(",", "."));
 
+  // ------------------------------
+  // UPDATE CELL
+  // ------------------------------
   async function updateCell(id, key, value) {
     try {
       const base = rows.find((r) => r.$id === id);
@@ -102,7 +124,7 @@ export default function SuiviTravaux() {
 
       if (key === "travaux") {
         const entry = Object.entries(tarifs).find(
-          ([, x]) => x.travaux === value
+          ([, t]) => t.travaux === value
         );
         if (entry) {
           updated.code = entry[0];
@@ -125,12 +147,15 @@ export default function SuiviTravaux() {
 
       await databases.updateDocument(DB_ID, COLLECTION, id, clean);
 
-      setRows((p) => p.map((r) => (r.$id === id ? updated : r)));
+      setRows((prev) => prev.map((r) => (r.$id === id ? updated : r)));
     } catch (e) {
       console.error("Erreur updateCell :", e);
     }
   }
 
+  // ------------------------------
+  // ADD ROW
+  // ------------------------------
   async function addRow() {
     try {
       const now = new Date();
@@ -139,7 +164,6 @@ export default function SuiviTravaux() {
         semaine: weekNumber(now),
         mois: selectedMonth,
         annee: selectedYear,
-        description: "",
         plaque: "",
         travaux: "",
         code: "",
@@ -161,6 +185,9 @@ export default function SuiviTravaux() {
     }
   }
 
+  // ------------------------------
+  // DELETE
+  // ------------------------------
   async function del(id) {
     if (!window.confirm("Supprimer ?")) return;
     try {
@@ -171,6 +198,9 @@ export default function SuiviTravaux() {
     }
   }
 
+  // ------------------------------
+  // EXPORT
+  // ------------------------------
   function exportExcel() {
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
@@ -178,6 +208,9 @@ export default function SuiviTravaux() {
     XLSX.writeFile(wb, "SuiviTravaux.xlsx");
   }
 
+  // ------------------------------
+  // SAVE MOBILE
+  // ------------------------------
   async function saveMobile() {
     try {
       const d = new Date(form.date);
@@ -195,6 +228,7 @@ export default function SuiviTravaux() {
       };
 
       await databases.createDocument(DB_ID, COLLECTION, ID.unique(), payload);
+
       alert("Travail enregistré !");
       setStep(1);
       setForm({
@@ -207,19 +241,19 @@ export default function SuiviTravaux() {
       });
     } catch (e) {
       console.error("Erreur saveMobile:", e);
-      alert("Erreur Appwrite");
     }
   }
 
-  // ------------------------------
-  // MOBILE WIZARD
-  // ------------------------------
+  // ============================================================================
+  //   MOBILE WIZARD
+  // ============================================================================
   if (isMobile) {
     return (
       <div style={{ padding: 20, fontFamily: "Arial" }}>
         <button onClick={() => navigate("/dashboard")}>⬅ Retour</button>
         <h2>📱 Ajouter un travail</h2>
 
+        {/* ÉTAPE 1 */}
         {step === 1 && (
           <>
             <h3>📅 Date</h3>
@@ -229,29 +263,30 @@ export default function SuiviTravaux() {
               onChange={(e) => setForm({ ...form, date: e.target.value })}
               style={inp}
             />
-            <button style={btn} onClick={() => setStep(2)}>Suivant ➡</button>
+            <button style={btn} onClick={() => setStep(2)}>
+              Suivant ➡
+            </button>
           </>
         )}
 
+        {/* ÉTAPE 2 */}
         {step === 2 && (
           <>
             <h3>🛠️ Travaux</h3>
             <select
               value={form.travaux}
               onChange={(e) => {
-                const t = Object.entries(tarifs).find(
-                  ([, x]) => x.travaux === e.target.value
+                const entry = Object.entries(tarifs).find(
+                  ([, t]) => t.travaux === e.target.value
                 );
-                if (t) {
+                if (entry) {
                   setForm({
                     ...form,
-                    travaux: t[1].travaux,
-                    code: t[0],
-                    prix: t[1].prix,
+                    travaux: entry[1].travaux,
+                    code: entry[0],
+                    prix: entry[1].prix,
                   });
-                } else {
-                  setForm({ ...form, travaux: e.target.value });
-                }
+                } else setForm({ ...form, travaux: e.target.value });
               }}
               style={inp}
             >
@@ -262,10 +297,14 @@ export default function SuiviTravaux() {
                 </option>
               ))}
             </select>
-            <button style={btn} onClick={() => setStep(3)}>Suivant ➡</button>
+
+            <button style={btn} onClick={() => setStep(3)}>
+              Suivant ➡
+            </button>
           </>
         )}
 
+        {/* ÉTAPE 3 */}
         {step === 3 && (
           <>
             <h3>🔢 Quantité</h3>
@@ -300,9 +339,10 @@ export default function SuiviTravaux() {
       </div>
     );
   }
-  // ------------------------------
-  // DESKTOP VIEW
-  // ------------------------------
+
+  // ============================================================================
+  //   DESKTOP VERSION
+  // ============================================================================
   return (
     <div style={page}>
       <div style={card}>
@@ -319,7 +359,7 @@ export default function SuiviTravaux() {
           </button>
         </div>
 
-        {/* FILTRES MOIS + ANNÉE */}
+        {/* FILTRES */}
         <div style={filterRow}>
           {/* ANNÉE */}
           <select
@@ -336,7 +376,7 @@ export default function SuiviTravaux() {
             )}
           </select>
 
-          {/* MOIS TEXTE */}
+          {/* MOIS */}
           <select
             style={select}
             value={selectedMonth}
@@ -363,7 +403,7 @@ export default function SuiviTravaux() {
           </select>
         </div>
 
-        {/* TABLEAU */}
+        {/* TABLE */}
         <table style={table}>
           <thead>
             <tr>
@@ -382,25 +422,23 @@ export default function SuiviTravaux() {
           <tbody>
             {rows
               .filter((r) => Number(r.mois) === Number(selectedMonth))
-              .filter((r) => {
-                const d = new Date(r.date);
-                return d.getFullYear() === selectedYear;
-              })
+              .filter((r) => new Date(r.date).getFullYear() === selectedYear)
               .map((r) => (
                 <tr key={r.$id} style={row}>
+                  {/* DATE */}
                   <td style={td}>
                     <input
                       type="date"
                       style={input}
                       value={r.date || ""}
-                      onChange={(e) =>
-                        updateCell(r.$id, "date", e.target.value)
-                      }
+                      onChange={(e) => updateCell(r.$id, "date", e.target.value)}
                     />
                   </td>
 
+                  {/* SEMAINE */}
                   <td style={tdCenter}>{r.semaine}</td>
 
+                  {/* PLAQUE */}
                   <td style={td}>
                     <input
                       style={input}
@@ -411,6 +449,7 @@ export default function SuiviTravaux() {
                     />
                   </td>
 
+                  {/* TRAVAUX */}
                   <td style={td}>
                     <select
                       style={input}
@@ -428,16 +467,16 @@ export default function SuiviTravaux() {
                     </select>
                   </td>
 
+                  {/* CODE */}
                   <td style={td}>
                     <input
                       style={input}
                       value={r.code || ""}
-                      onChange={(e) =>
-                        updateCell(r.$id, "code", e.target.value)
-                      }
+                      onChange={(e) => updateCell(r.$id, "code", e.target.value)}
                     />
                   </td>
 
+                  {/* QUANTITE */}
                   <td style={tdCenter}>
                     <input
                       type="number"
@@ -449,27 +488,23 @@ export default function SuiviTravaux() {
                     />
                   </td>
 
+                  {/* PRIX */}
                   <td style={tdCenter}>
                     <input
                       type="number"
                       step="0.01"
                       style={inputCenter}
                       value={r.prix}
-                      onChange={(e) =>
-                        updateCell(r.$id, "prix", e.target.value)
-                      }
+                      onChange={(e) => updateCell(r.$id, "prix", e.target.value)}
                     />
                   </td>
 
-                  <td style={tdCenter}>
-                    {Number(r.total).toFixed(2)} €
-                  </td>
+                  {/* TOTAL */}
+                  <td style={tdCenter}>{Number(r.total).toFixed(2)} €</td>
 
+                  {/* DELETE */}
                   <td style={tdCenter}>
-                    <button
-                      onClick={() => del(r.$id)}
-                      style={deleteBtn}
-                    >
+                    <button style={deleteBtn} onClick={() => del(r.$id)}>
                       ❌
                     </button>
                   </td>
@@ -478,7 +513,7 @@ export default function SuiviTravaux() {
           </tbody>
         </table>
 
-        {/* ADD ROW */}
+        {/* ADD BUTTON */}
         <button style={btnGreen} onClick={addRow}>
           ➕ Ajouter une ligne
         </button>
@@ -487,10 +522,9 @@ export default function SuiviTravaux() {
   );
 }
 
-// ------------------------------
-// STYLES
-// ------------------------------
-
+// ============================================================================
+//   STYLES
+// ============================================================================
 const page = {
   background: "#f5f7fb",
   minHeight: "100vh",
