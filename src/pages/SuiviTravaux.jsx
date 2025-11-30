@@ -323,7 +323,7 @@ export default function SuiviTravaux() {
     return (
       <div style={{ padding: 20, fontFamily: "Arial" }}>
         <button onClick={() => navigate("/dashboard")}>⬅ Retour</button>
-        <h2>📱 Ajouter un travail</h2>
+        <h2>📱 Ajout de travaux</h2>
 
         {/* STEP 1 — DATE */}
         {step === 1 && (
