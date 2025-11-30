@@ -7,7 +7,8 @@
 // + Filtres simplifiés
 // + Style factorisé
 // + 100% compatible Appwrite
-// + Colonne PLAQUE (desktop + mobile)
+// + Champ Plaque
+// + Colonne Semaine (auto depuis la date)
 
 import React, { useEffect, useState } from "react";
 import { databases, ID } from "../appwrite";
@@ -91,8 +92,9 @@ export default function SuiviTravaux() {
   // Filtres colonne par colonne
   const [filters, setFilters] = useState({
     date: "",
+    semaine: "",
     description: "",
-    plaque: "",       // <<< NEW
+    plaque: "",
     travaux: "",
     quantite: "",
     prix: "",
@@ -103,7 +105,7 @@ export default function SuiviTravaux() {
   const [form, setForm] = useState({
     date: "",
     description: "",
-    plaque: "",       // <<< NEW
+    plaque: "",
     travaux: "",
     code: "",
     quantite: "",
@@ -134,7 +136,7 @@ export default function SuiviTravaux() {
   const norm = (v) => Number(String(v || 0).replace(",", "."));
 
   // ------------------------------
-  // UPDATE CELL
+  // UPDATE CELL (optimisé, sécurisé ISF)
   // ------------------------------
   async function updateCell(id, key, value, force = false) {
     try {
@@ -240,7 +242,7 @@ export default function SuiviTravaux() {
       const row = {
         date: now.toISOString().split("T")[0],
         description: "",
-        plaque: "",          // <<< NEW
+        plaque: "",
         semaine: weekNumber(now),
         mois: selectedMonth,
         annee: selectedYear,
@@ -296,7 +298,7 @@ export default function SuiviTravaux() {
         const row = {
           date: form.date,
           description: form.description,
-          plaque: form.plaque,   // <<< NEW
+          plaque: form.plaque || "",
           semaine: weekNumber(now),
           mois: now.getMonth() + 1,
           annee: now.getFullYear(),
@@ -353,11 +355,11 @@ export default function SuiviTravaux() {
               style={inpMobile}
             />
 
-            <h3>🏷️ Plaque</h3>
+            <h3>🧱 Plaque</h3>
             <input
               type="text"
-              placeholder="Ex: PLAQUE-01"
-              value={form.plaque}
+              placeholder="Ex: PLAQUE 123"
+              value={form.plaque || ""}
               onChange={(e) =>
                 setForm({ ...form, plaque: e.target.value })
               }
@@ -531,8 +533,9 @@ export default function SuiviTravaux() {
             <tr>
               <th style={th}>ISF</th>
               <th style={th}>Date</th>
+              <th style={{ ...th, width: 70 }}>Semaine</th>
               <th style={th}>Description</th>
-              <th style={{ ...th, width: 50 }}>Plaque</th>
+              <th style={{ ...th, width: 110 }}>Plaque</th>
               <th style={th}>Travaux</th>
               <th style={{ ...th, width: 60 }}>Qté</th>
               <th style={{ ...th, width: 80 }}>Prix</th>
@@ -564,6 +567,31 @@ export default function SuiviTravaux() {
                       value={filters.date}
                       onChange={(e) =>
                         setFilters((f) => ({ ...f, date: e.target.value }))
+                      }
+                    />
+                  </div>
+                )}
+              </th>
+
+              {/* SEMAINE */}
+              <th style={{ position: "relative" }}>
+                <span
+                  style={{ marginLeft: 4, cursor: "pointer", opacity: 0.6 }}
+                  onClick={() =>
+                    setOpenFilter(openFilter === "semaine" ? null : "semaine")
+                  }
+                >
+                  {excelFilterIcon}
+                </span>
+
+                {openFilter === "semaine" && (
+                  <div style={filterPopup}>
+                    <input
+                      type="number"
+                      style={inputCenter}
+                      value={filters.semaine}
+                      onChange={(e) =>
+                        setFilters((f) => ({ ...f, semaine: e.target.value }))
                       }
                     />
                   </div>
@@ -655,9 +683,7 @@ export default function SuiviTravaux() {
                 <span
                   style={{ marginLeft: 4, cursor: "pointer", opacity: 0.6 }}
                   onClick={() =>
-                    setOpenFilter(
-                      openFilter === "quantite" ? null : "quantite"
-                    )
+                    setOpenFilter(openFilter === "quantite" ? null : "quantite")
                   }
                 >
                   {excelFilterIcon}
@@ -670,10 +696,7 @@ export default function SuiviTravaux() {
                       style={inputCenter}
                       value={filters.quantite}
                       onChange={(e) =>
-                        setFilters((f) => ({
-                          ...f,
-                          quantite: e.target.value,
-                        }))
+                        setFilters((f) => ({ ...f, quantite: e.target.value }))
                       }
                     />
                   </div>
@@ -773,6 +796,11 @@ export default function SuiviTravaux() {
 
               .filter((r) => (filters.date ? r.date === filters.date : true))
               .filter((r) =>
+                filters.semaine
+                  ? String(r.semaine) === String(filters.semaine)
+                  : true
+              )
+              .filter((r) =>
                 r.description
                   ?.toLowerCase()
                   .includes(filters.description.toLowerCase())
@@ -784,7 +812,9 @@ export default function SuiviTravaux() {
                 r.travaux?.toLowerCase().includes(filters.travaux.toLowerCase())
               )
               .filter((r) =>
-                filters.quantite ? String(r.quantite) === filters.quantite : true
+                filters.quantite
+                  ? String(r.quantite) === filters.quantite
+                  : true
               )
               .filter((r) =>
                 filters.prix ? String(r.prix) === filters.prix : true
@@ -832,6 +862,9 @@ export default function SuiviTravaux() {
                       />
                     </td>
 
+                    {/* SEMAINE (readonly) */}
+                    <td style={tdCenter}>{r.semaine ?? ""}</td>
+
                     {/* DESCRIPTION */}
                     <td style={td}>
                       <input
@@ -844,18 +877,17 @@ export default function SuiviTravaux() {
                       />
                     </td>
 
-                    {/* PLAQUE (colonne réduite) */}
-<td style={{ ...td, maxWidth: 120 }}>
-  <input
-    disabled={locked}
-    style={{ ...input, width: "100%" }}
-    value={r.plaque || ""}
-    onChange={(e) =>
-      updateCell(r.$id, "plaque", e.target.value)
-    }
-  />
-</td>
-
+                    {/* PLAQUE */}
+                    <td style={td}>
+                      <input
+                        disabled={locked}
+                        style={input}
+                        value={r.plaque || ""}
+                        onChange={(e) =>
+                          updateCell(r.$id, "plaque", e.target.value)
+                        }
+                      />
+                    </td>
 
                     {/* TRAVAUX */}
                     <td style={td}>
@@ -959,14 +991,11 @@ const page = {
   minHeight: "100vh",
   padding: 20,
   fontFamily: "Arial",
-  backgroundColor: "#ffffff",           // 🔁 avant : #f5f7fb (bleuté)
-  backgroundImage: "url('/Fond.png')",  // image de fond
+  backgroundImage: "url('/Fond.png')",
   backgroundSize: "cover",
   backgroundPosition: "center",
   backgroundRepeat: "no-repeat",
 };
-
-
 
 const card = {
   background: "white",
@@ -974,7 +1003,7 @@ const card = {
   borderRadius: 12,
   maxWidth: 1400,
   margin: "0 auto",
-  boxShadow: "0 4px 15px rgba(0, 0, 0, 0.1)",
+  boxShadow: "0 4px 15px rgba(0,0,0,0.1)",
 };
 
 const header = {
@@ -1005,14 +1034,15 @@ const select = {
   fontSize: 14,
 };
 
-const table = {
+
+  const table = {
   width: "100%",
-  borderCollapse: "separate",  // 🔁 avant : "collapse"
-  borderSpacing: "8px 0",      // <-- espace horizontal identique entre toutes les cases
+  // on sépare les cellules pour créer un espace entre elles
+  borderCollapse: "separate",
+  borderSpacing: "6px 0",   // 8px d’espace horizontal, 0 vertical
   marginBottom: 20,
   fontSize: 14,
 };
-
 
 const th = {
   background: "#eef2ff",
@@ -1038,14 +1068,12 @@ const tdCenter = {
 };
 
 const input = {
-  width: "90%",          // au lieu de "100%"
-  margin: "0 auto",      // centre l’input dans la cellule
-  padding: "6px 1px",
-  borderRadius: 8,
+  width: "100%",
+  padding: "6px 10px",
+  borderRadius: 6,
   border: "1px solid #cbd5e1",
   background: "white",
 };
-
 
 const inputCenter = {
   ...input,
@@ -1100,7 +1128,7 @@ const filterPopup = {
   padding: 10,
   border: "1px solid #ccc",
   borderRadius: 6,
-  boxShadow: "0 3px 8px rgba(0, 0, 0, 0.15)",
+  boxShadow: "0 3px 8px rgba(0,0,0,0.15)",
   zIndex: 100,
   width: 180,
 };
