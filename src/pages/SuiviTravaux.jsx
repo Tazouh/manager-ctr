@@ -1,7 +1,13 @@
 // --- SuiviTravaux.jsx ---
-// VERSION PC + VERSION MOBILE WIZARD
-// Appwrite + Auto code/prix/total + Responsive + Description + Commentaire
-// -----------------------------------------------------------------------
+// VERSION SEMI-OPTIMISÉE
+// + Alignement & espacement améliorés
+// + Colonnes Quantité / Prix réduites
+// + € aligné proprement
+// + Nettoyage des doublons
+// + Filtres simplifiés
+// + Style factorisé
+// + 100% compatible Appwrite
+// + Colonne PLAQUE (desktop + mobile)
 
 import React, { useEffect, useState } from "react";
 import { databases, ID } from "../appwrite";
@@ -45,7 +51,7 @@ const tarifs = {
 };
 
 // ------------------------------
-// SEMAINE DU MOIS
+// WEEK NUMBER
 // ------------------------------
 function weekNumber(d) {
   const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -55,6 +61,9 @@ function weekNumber(d) {
   return Math.ceil(((date - yearStart) / 86400000 + 1) / 7);
 }
 
+// ============================================================================
+// COMPONENT
+// ============================================================================
 export default function SuiviTravaux() {
   const navigate = useNavigate();
 
@@ -67,15 +76,34 @@ export default function SuiviTravaux() {
     return () => window.removeEventListener("resize", check);
   }, []);
 
+  // Unlock counter (ISF)
+  const [unlockCounter, setUnlockCounter] = useState(0);
+
   // STATE
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [rows, setRows] = useState([]);
   const [step, setStep] = useState(1);
 
+  // Vue ISF uniquement
+  const [showISFOnly, setShowISFOnly] = useState(false);
+
+  // Filtres colonne par colonne
+  const [filters, setFilters] = useState({
+    date: "",
+    description: "",
+    plaque: "",       // <<< NEW
+    travaux: "",
+    quantite: "",
+    prix: "",
+    commentaire: "",
+    total: "",
+  });
+
   const [form, setForm] = useState({
     date: "",
     description: "",
+    plaque: "",       // <<< NEW
     travaux: "",
     code: "",
     quantite: "",
@@ -83,21 +111,40 @@ export default function SuiviTravaux() {
     commentaire: "",
   });
 
+  const [openFilter, setOpenFilter] = useState(null);
+
+  const excelFilterIcon = (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M3 5h18v2H3V5zm4 6h10v2H7v-2zm-4 6h18v2H3v-2z" />
+    </svg>
+  );
+
   // LOAD DATA
   useEffect(() => {
-    databases
-      .listDocuments(DB_ID, COLLECTION)
-      .then((res) => setRows(res.documents || []))
-      .catch((err) => console.error("Erreur loadRows:", err));
+    databases.listDocuments(DB_ID, COLLECTION).then((res) => {
+      const docs = res.documents.map((d) => ({
+        ...d,
+        isfLocked: Boolean(d.isfLocked),
+        isfNumero: d.isfNumero ?? "",
+      }));
+      setRows(docs);
+    });
   }, []);
 
   const norm = (v) => Number(String(v || 0).replace(",", "."));
 
+  // ------------------------------
   // UPDATE CELL
-  async function updateCell(id, key, value) {
+  // ------------------------------
+  async function updateCell(id, key, value, force = false) {
     try {
       const base = rows.find((r) => r.$id === id);
       if (!base) return;
+
+      if (base.isfLocked && !["isfLocked", "isfNumero"].includes(key) && !force) {
+        alert("Cette ligne est verrouillée (ISF activé)");
+        return;
+      }
 
       const updated = { ...base, [key]: value };
 
@@ -114,9 +161,7 @@ export default function SuiviTravaux() {
       }
 
       if (key === "travaux") {
-        const found = Object.entries(tarifs).find(
-          ([, t]) => t.travaux === value
-        );
+        const found = Object.entries(tarifs).find(([_, t]) => t.travaux === value);
         if (found) {
           updated.code = found[0];
           updated.prix = found[1].prix;
@@ -127,24 +172,75 @@ export default function SuiviTravaux() {
       updated.prix = norm(updated.prix);
       updated.total = Number((updated.quantite * updated.prix).toFixed(2));
 
-      const { $id, $collectionId, $databaseId, $createdAt, $updatedAt, ...clean } =
-        updated;
+      updated.isfLocked = Boolean(updated.isfLocked);
+      updated.isfNumero = updated.isfNumero ?? "";
+
+      const clean = { ...updated };
+      delete clean.$id;
+      delete clean.$collectionId;
+      delete clean.$databaseId;
+      delete clean.$createdAt;
+      delete clean.$updatedAt;
 
       await databases.updateDocument(DB_ID, COLLECTION, id, clean);
 
-      setRows((p) => p.map((r) => (r.$id === id ? updated : r)));
+      setRows((prev) => prev.map((r) => (r.$id === id ? updated : r)));
     } catch (e) {
       console.error("Erreur updateCell :", e);
     }
   }
 
-  // ADD ROW
+  // ------------------------------
+  // ACTIVER / DESACTIVER ISF
+  // ------------------------------
+  async function toggleISF(row) {
+    if (!row.isfLocked) {
+      const numero = prompt("Numéro d'attachement ISF :");
+      if (!numero || numero.trim() === "") return;
+
+      await databases.updateDocument(DB_ID, COLLECTION, row.$id, {
+        isfLocked: true,
+        isfNumero: numero.trim(),
+      });
+
+      setRows((prev) =>
+        prev.map((r) =>
+          r.$id === row.$id ? { ...r, isfLocked: true, isfNumero: numero.trim() } : r
+        )
+      );
+      return;
+    }
+
+    const next = unlockCounter + 1;
+    setUnlockCounter(next);
+
+    if (next < 8) return;
+
+    await databases.updateDocument(DB_ID, COLLECTION, row.$id, {
+      isfLocked: false,
+      isfNumero: "",
+    });
+
+    setUnlockCounter(0);
+
+    setRows((prev) =>
+      prev.map((r) =>
+        r.$id === row.$id ? { ...r, isfLocked: false, isfNumero: "" } : r
+      )
+    );
+  }
+
+  // ------------------------------
+  // AJOUTER UNE LIGNE
+  // ------------------------------
   async function addRow() {
     try {
       const now = new Date();
+
       const row = {
         date: now.toISOString().split("T")[0],
         description: "",
+        plaque: "",          // <<< NEW
         semaine: weekNumber(now),
         mois: selectedMonth,
         annee: selectedYear,
@@ -154,14 +250,11 @@ export default function SuiviTravaux() {
         prix: 0,
         total: 0,
         commentaire: "",
+        isfLocked: false,
+        isfNumero: "",
       };
 
-      const doc = await databases.createDocument(
-        DB_ID,
-        COLLECTION,
-        ID.unique(),
-        row
-      );
+      const doc = await databases.createDocument(DB_ID, COLLECTION, ID.unique(), row);
 
       setRows((r) => [...r, doc]);
     } catch (e) {
@@ -169,7 +262,9 @@ export default function SuiviTravaux() {
     }
   }
 
-  // DELETE ROW
+  // ------------------------------
+  // SUPPRESSION
+  // ------------------------------
   async function del(id) {
     if (!window.confirm("Supprimer ?")) return;
     try {
@@ -180,7 +275,9 @@ export default function SuiviTravaux() {
     }
   }
 
+  // ------------------------------
   // EXPORT EXCEL
+  // ------------------------------
   function exportExcel() {
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
@@ -188,47 +285,39 @@ export default function SuiviTravaux() {
     XLSX.writeFile(wb, "SuiviTravaux.xlsx");
   }
 
-  // SAVE MOBILE
-  async function saveMobile() {
-    try {
-      const d = new Date(form.date);
-
-      const payload = {
-        date: form.date,
-        description: form.description,
-        semaine: weekNumber(d),
-        mois: d.getMonth() + 1,
-        annee: d.getFullYear(),
-        travaux: form.travaux,
-        code: form.code,
-        quantite: norm(form.quantite),
-        prix: norm(form.prix),
-        total: Number((norm(form.quantite) * norm(form.prix)).toFixed(2)),
-        commentaire: form.commentaire,
-      };
-
-      await databases.createDocument(DB_ID, COLLECTION, ID.unique(), payload);
-
-      alert("Travail enregistré !");
-      setStep(1);
-      setForm({
-        date: "",
-        description: "",
-        travaux: "",
-        code: "",
-        quantite: "",
-        prix: "",
-        commentaire: "",
-      });
-    } catch (e) {
-      console.error("Erreur saveMobile:", e);
-    }
-  }
-
   // ========================================================================
-  // MOBILE WIZARD
+  // MOBILE VERSION
   // ========================================================================
   if (isMobile) {
+    async function saveMobile() {
+      try {
+        const now = new Date(form.date);
+
+        const row = {
+          date: form.date,
+          description: form.description,
+          plaque: form.plaque,   // <<< NEW
+          semaine: weekNumber(now),
+          mois: now.getMonth() + 1,
+          annee: now.getFullYear(),
+          travaux: form.travaux,
+          code: form.code,
+          quantite: norm(form.quantite),
+          prix: norm(form.prix),
+          total: Number((norm(form.quantite) * norm(form.prix)).toFixed(2)),
+          commentaire: form.commentaire,
+          isfLocked: false,
+          isfNumero: "",
+        };
+
+        await databases.createDocument(DB_ID, COLLECTION, ID.unique(), row);
+        alert("Travail ajouté !");
+        navigate("/dashboard");
+      } catch (e) {
+        console.error("Erreur saveMobile:", e);
+      }
+    }
+
     return (
       <div style={{ padding: 20, fontFamily: "Arial" }}>
         <button onClick={() => navigate("/dashboard")}>⬅ Retour</button>
@@ -250,19 +339,31 @@ export default function SuiviTravaux() {
           </>
         )}
 
-        {/* STEP 2 — DESCRIPTION */}
+        {/* STEP 2 — DESCRIPTION + PLAQUE */}
         {step === 2 && (
           <>
             <h3>📝 Description</h3>
             <input
               type="text"
-              placeholder="Ex: PMT 07215 DOU1"
+              placeholder="Ex: CDI07_FD08_6000"
               value={form.description}
               onChange={(e) =>
                 setForm({ ...form, description: e.target.value })
               }
               style={inpMobile}
             />
+
+            <h3>🏷️ Plaque</h3>
+            <input
+              type="text"
+              placeholder="Ex: PLAQUE-01"
+              value={form.plaque}
+              onChange={(e) =>
+                setForm({ ...form, plaque: e.target.value })
+              }
+              style={inpMobile}
+            />
+
             <button style={btnMobile} onClick={() => setStep(3)}>
               Suivant ➡
             </button>
@@ -364,12 +465,24 @@ export default function SuiviTravaux() {
 
           <h2 style={title}>📋 Suivi de travaux</h2>
 
-          <button style={btnBlue} onClick={exportExcel}>
-            💾 Export Excel
-          </button>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button
+              style={{
+                ...btnBlue,
+                background: showISFOnly ? "#f97316" : "#2563eb",
+              }}
+              onClick={() => setShowISFOnly((v) => !v)}
+            >
+              {showISFOnly ? "Afficher tout" : "Voir ISF"}
+            </button>
+
+            <button style={btnBlue} onClick={exportExcel}>
+              💾 Export Excel
+            </button>
+          </div>
         </div>
 
-        {/* FILTER MONTH/YEAR */}
+        {/* FILTER MONTH / YEAR */}
         <div style={filterRow}>
           <select
             style={select}
@@ -414,114 +527,423 @@ export default function SuiviTravaux() {
         {/* TABLE DESKTOP */}
         <table style={table}>
           <thead>
+            {/* COLONNES */}
             <tr>
+              <th style={th}>ISF</th>
               <th style={th}>Date</th>
               <th style={th}>Description</th>
+              <th style={{ ...th, width: 50 }}>Plaque</th>
               <th style={th}>Travaux</th>
-              <th style={th}>Quantité</th>
-              <th style={th}>Prix</th>
+              <th style={{ ...th, width: 60 }}>Qté</th>
+              <th style={{ ...th, width: 80 }}>Prix</th>
               <th style={th}>Total</th>
               <th style={th}>Commentaire</th>
               <th style={th}></th>
             </tr>
+
+            {/* FILTRES */}
+            <tr>
+              <th />
+
+              {/* DATE */}
+              <th style={{ position: "relative" }}>
+                <span
+                  style={{ marginLeft: 4, cursor: "pointer", opacity: 0.6 }}
+                  onClick={() =>
+                    setOpenFilter(openFilter === "date" ? null : "date")
+                  }
+                >
+                  {excelFilterIcon}
+                </span>
+
+                {openFilter === "date" && (
+                  <div style={filterPopup}>
+                    <input
+                      type="date"
+                      style={input}
+                      value={filters.date}
+                      onChange={(e) =>
+                        setFilters((f) => ({ ...f, date: e.target.value }))
+                      }
+                    />
+                  </div>
+                )}
+              </th>
+
+              {/* DESCRIPTION */}
+              <th style={{ position: "relative" }}>
+                <span
+                  style={{ marginLeft: 4, cursor: "pointer", opacity: 0.6 }}
+                  onClick={() =>
+                    setOpenFilter(
+                      openFilter === "description" ? null : "description"
+                    )
+                  }
+                >
+                  {excelFilterIcon}
+                </span>
+
+                {openFilter === "description" && (
+                  <div style={filterPopup}>
+                    <input
+                      style={input}
+                      placeholder="Contient..."
+                      value={filters.description}
+                      onChange={(e) =>
+                        setFilters((f) => ({
+                          ...f,
+                          description: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                )}
+              </th>
+
+              {/* PLAQUE */}
+              <th style={{ position: "relative" }}>
+                <span
+                  style={{ marginLeft: 4, cursor: "pointer", opacity: 0.6 }}
+                  onClick={() =>
+                    setOpenFilter(openFilter === "plaque" ? null : "plaque")
+                  }
+                >
+                  {excelFilterIcon}
+                </span>
+
+                {openFilter === "plaque" && (
+                  <div style={filterPopup}>
+                    <input
+                      style={input}
+                      placeholder="Contient..."
+                      value={filters.plaque}
+                      onChange={(e) =>
+                        setFilters((f) => ({ ...f, plaque: e.target.value }))
+                      }
+                    />
+                  </div>
+                )}
+              </th>
+
+              {/* TRAVAUX */}
+              <th style={{ position: "relative" }}>
+                <span
+                  style={{ marginLeft: 4, cursor: "pointer", opacity: 0.6 }}
+                  onClick={() =>
+                    setOpenFilter(openFilter === "travaux" ? null : "travaux")
+                  }
+                >
+                  {excelFilterIcon}
+                </span>
+
+                {openFilter === "travaux" && (
+                  <div style={filterPopup}>
+                    <input
+                      style={input}
+                      placeholder="Contient..."
+                      value={filters.travaux}
+                      onChange={(e) =>
+                        setFilters((f) => ({ ...f, travaux: e.target.value }))
+                      }
+                    />
+                  </div>
+                )}
+              </th>
+
+              {/* QUANTITÉ */}
+              <th style={{ position: "relative" }}>
+                <span
+                  style={{ marginLeft: 4, cursor: "pointer", opacity: 0.6 }}
+                  onClick={() =>
+                    setOpenFilter(
+                      openFilter === "quantite" ? null : "quantite"
+                    )
+                  }
+                >
+                  {excelFilterIcon}
+                </span>
+
+                {openFilter === "quantite" && (
+                  <div style={filterPopup}>
+                    <input
+                      type="number"
+                      style={inputCenter}
+                      value={filters.quantite}
+                      onChange={(e) =>
+                        setFilters((f) => ({
+                          ...f,
+                          quantite: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                )}
+              </th>
+
+              {/* PRIX */}
+              <th style={{ position: "relative" }}>
+                <span
+                  style={{ marginLeft: 4, cursor: "pointer", opacity: 0.6 }}
+                  onClick={() =>
+                    setOpenFilter(openFilter === "prix" ? null : "prix")
+                  }
+                >
+                  {excelFilterIcon}
+                </span>
+
+                {openFilter === "prix" && (
+                  <div style={filterPopup}>
+                    <input
+                      type="number"
+                      style={inputCenter}
+                      value={filters.prix}
+                      onChange={(e) =>
+                        setFilters((f) => ({ ...f, prix: e.target.value }))
+                      }
+                    />
+                  </div>
+                )}
+              </th>
+
+              {/* TOTAL */}
+              <th style={{ position: "relative" }}>
+                <span
+                  style={{ marginLeft: 4, cursor: "pointer", opacity: 0.6 }}
+                  onClick={() =>
+                    setOpenFilter(openFilter === "total" ? null : "total")
+                  }
+                >
+                  {excelFilterIcon}
+                </span>
+
+                {openFilter === "total" && (
+                  <div style={filterPopup}>
+                    <input
+                      type="number"
+                      style={inputCenter}
+                      value={filters.total}
+                      onChange={(e) =>
+                        setFilters((f) => ({ ...f, total: e.target.value }))
+                      }
+                    />
+                  </div>
+                )}
+              </th>
+
+              {/* COMMENTAIRE */}
+              <th style={{ position: "relative" }}>
+                <span
+                  style={{ marginLeft: 4, cursor: "pointer", opacity: 0.6 }}
+                  onClick={() =>
+                    setOpenFilter(
+                      openFilter === "commentaire" ? null : "commentaire"
+                    )
+                  }
+                >
+                  {excelFilterIcon}
+                </span>
+
+                {openFilter === "commentaire" && (
+                  <div style={filterPopup}>
+                    <input
+                      style={input}
+                      placeholder="Contient..."
+                      value={filters.commentaire}
+                      onChange={(e) =>
+                        setFilters((f) => ({
+                          ...f,
+                          commentaire: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                )}
+              </th>
+
+              <th />
+            </tr>
           </thead>
 
+          {/* BODY */}
           <tbody>
             {rows
               .filter((r) => Number(r.mois) === Number(selectedMonth))
               .filter((r) => new Date(r.date).getFullYear() === selectedYear)
-              .map((r) => (
-                <tr key={r.$id} style={row}>
-                  {/* DATE */}
-                  <td style={td}>
-                    <input
-                      type="date"
-                      style={input}
-                      value={r.date || ""}
-                      onChange={(e) => updateCell(r.$id, "date", e.target.value)}
-                    />
-                  </td>
+              .filter((r) => (showISFOnly ? r.isfLocked : true))
 
-                  {/* DESCRIPTION */}
-                  <td style={td}>
-                    <input
-                      style={input}
-                      value={r.description || ""}
-                      onChange={(e) =>
-                        updateCell(r.$id, "description", e.target.value)
-                      }
-                    />
-                  </td>
+              .filter((r) => (filters.date ? r.date === filters.date : true))
+              .filter((r) =>
+                r.description
+                  ?.toLowerCase()
+                  .includes(filters.description.toLowerCase())
+              )
+              .filter((r) =>
+                r.plaque?.toLowerCase().includes(filters.plaque.toLowerCase())
+              )
+              .filter((r) =>
+                r.travaux?.toLowerCase().includes(filters.travaux.toLowerCase())
+              )
+              .filter((r) =>
+                filters.quantite ? String(r.quantite) === filters.quantite : true
+              )
+              .filter((r) =>
+                filters.prix ? String(r.prix) === filters.prix : true
+              )
+              .filter((r) =>
+                filters.total ? String(r.total) === filters.total : true
+              )
+              .filter((r) =>
+                r.commentaire
+                  ?.toLowerCase()
+                  .includes(filters.commentaire.toLowerCase())
+              )
 
-                  {/* TRAVAUX */}
-                  <td style={td}>
-                    <select
-                      style={input}
-                      value={r.travaux || ""}
-                      onChange={(e) =>
-                        updateCell(r.$id, "travaux", e.target.value)
-                      }
-                    >
-                      <option value="">—</option>
-                      {Object.entries(tarifs).map(([c, t]) => (
-                        <option key={c} value={t.travaux}>
-                          {t.travaux}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
+              .map((r) => {
+                const locked = Boolean(r.isfLocked);
 
-                  {/* QUANTITE */}
-                  <td style={tdCenter}>
-                    <input
-                      type="number"
-                      style={inputCenter}
-                      value={r.quantite}
-                      onChange={(e) =>
-                        updateCell(r.$id, "quantite", e.target.value)
-                      }
-                    />
-                  </td>
+                return (
+                  <tr
+                    key={r.$id}
+                    style={{
+                      ...row,
+                      background: locked ? "#ffe8e8" : "white",
+                    }}
+                  >
+                    {/* ISF */}
+                    <td style={tdCenter}>
+                      <input
+                        type="checkbox"
+                        checked={r.isfLocked}
+                        onChange={() => toggleISF(r)}
+                        style={{ width: 20, height: 20 }}
+                      />
+                    </td>
 
-                  {/* PRIX */}
-                  <td style={tdCenter}>
-                    <input
-                      type="number"
-                      step="0.01"
-                      style={inputCenter}
-                      value={r.prix}
-                      onChange={(e) =>
-                        updateCell(r.$id, "prix", e.target.value)
-                      }
-                    />
-                  </td>
+                    {/* DATE */}
+                    <td style={td}>
+                      <input
+                        type="date"
+                        disabled={locked}
+                        style={input}
+                        value={r.date || ""}
+                        onChange={(e) =>
+                          updateCell(r.$id, "date", e.target.value)
+                        }
+                      />
+                    </td>
 
-                  {/* TOTAL */}
-                  <td style={tdCenter}>{Number(r.total).toFixed(2)} €</td>
+                    {/* DESCRIPTION */}
+                    <td style={td}>
+                      <input
+                        disabled={locked}
+                        style={input}
+                        value={r.description || ""}
+                        onChange={(e) =>
+                          updateCell(r.$id, "description", e.target.value)
+                        }
+                      />
+                    </td>
 
-                  {/* COMMENTAIRE */}
-                  <td style={td}>
-                    <input
-                      style={input}
-                      value={r.commentaire || ""}
-                      onChange={(e) =>
-                        updateCell(r.$id, "commentaire", e.target.value)
-                      }
-                    />
-                  </td>
+                    {/* PLAQUE (colonne réduite) */}
+<td style={{ ...td, maxWidth: 120 }}>
+  <input
+    disabled={locked}
+    style={{ ...input, width: "100%" }}
+    value={r.plaque || ""}
+    onChange={(e) =>
+      updateCell(r.$id, "plaque", e.target.value)
+    }
+  />
+</td>
 
-                  {/* DELETE */}
-                  <td style={tdCenter}>
-                    <button style={deleteBtn} onClick={() => del(r.$id)}>
-                      ❌
-                    </button>
-                  </td>
-                </tr>
-              ))}
+
+                    {/* TRAVAUX */}
+                    <td style={td}>
+                      <select
+                        disabled={locked}
+                        style={input}
+                        value={r.travaux || ""}
+                        onChange={(e) =>
+                          updateCell(r.$id, "travaux", e.target.value)
+                        }
+                      >
+                        <option value="">—</option>
+                        {Object.entries(tarifs).map(([c, t]) => (
+                          <option key={c} value={t.travaux}>
+                            {t.travaux}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+
+                    {/* QUANTITÉ */}
+                    <td style={tdCenter}>
+                      <input
+                        disabled={locked}
+                        type="number"
+                        style={{ ...inputCenter, width: "55px" }}
+                        value={r.quantite}
+                        onChange={(e) =>
+                          updateCell(r.$id, "quantite", e.target.value)
+                        }
+                      />
+                    </td>
+
+                    {/* PRIX */}
+                    <td style={tdCenter}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 6,
+                        }}
+                      >
+                        <input
+                          disabled={locked}
+                          type="number"
+                          step="0.01"
+                          style={{ ...inputCenter, width: "70px" }}
+                          value={r.prix}
+                          onChange={(e) =>
+                            updateCell(r.$id, "prix", e.target.value)
+                          }
+                        />
+                        <span>€</span>
+                      </div>
+                    </td>
+
+                    {/* TOTAL */}
+                    <td style={{ ...tdCenter, whiteSpace: "nowrap" }}>
+                      {Number(r.total).toFixed(2)} €
+                    </td>
+
+                    {/* COMMENTAIRE */}
+                    <td style={td}>
+                      <input
+                        disabled={locked}
+                        style={input}
+                        value={r.commentaire || ""}
+                        onChange={(e) =>
+                          updateCell(r.$id, "commentaire", e.target.value)
+                        }
+                      />
+                    </td>
+
+                    {/* DELETE */}
+                    <td style={tdCenter}>
+                      {!locked && (
+                        <button style={deleteBtn} onClick={() => del(r.$id)}>
+                          ❌
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
           </tbody>
         </table>
 
-        {/* ADD BUTTON */}
         <button style={btnGreen} onClick={addRow}>
           ➕ Ajouter une ligne
         </button>
@@ -530,15 +952,20 @@ export default function SuiviTravaux() {
   );
 }
 
-// ========================================================================
+// ============================================================================
 // STYLES DESKTOP
-// ========================================================================
+// ============================================================================
 const page = {
-  background: "#f5f7fb",
   minHeight: "100vh",
   padding: 20,
   fontFamily: "Arial",
+  backgroundColor: "#f5f7fb",          // couleur de secours
+  backgroundImage: "url('/Fond.png')", // fichier dans /public
+  backgroundSize: "cover",
+  backgroundPosition: "center",
+  backgroundRepeat: "no-repeat",
 };
+
 
 const card = {
   background: "white",
@@ -546,7 +973,7 @@ const card = {
   borderRadius: 12,
   maxWidth: 1400,
   margin: "0 auto",
-  boxShadow: "0 4px 15px rgba(0,0,0,0.1)",
+  boxShadow: "0 4px 15px rgba(0, 0, 0, 0.1)",
 };
 
 const header = {
@@ -560,6 +987,7 @@ const title = {
   margin: 0,
   color: "#2563eb",
   fontSize: 24,
+  fontWeight: "bold",
 };
 
 const filterRow = {
@@ -585,7 +1013,7 @@ const table = {
 
 const th = {
   background: "#eef2ff",
-  padding: 12,
+  padding: 10,
   textAlign: "center",
   fontWeight: 600,
   borderBottom: "2px solid #d1d5db",
@@ -593,11 +1021,11 @@ const th = {
 
 const row = {
   borderBottom: "1px solid #e5e7eb",
-  height: 50,
+  height: 48,
 };
 
 const td = {
-  padding: "8px 10px",
+  padding: "6px 10px",
   verticalAlign: "middle",
 };
 
@@ -607,15 +1035,27 @@ const tdCenter = {
 };
 
 const input = {
-  width: "100%",
-  padding: "6px 10px",
-  borderRadius: 6,
+  width: "90%",          // au lieu de "100%"
+  margin: "0 auto",      // centre l’input dans la cellule
+  padding: "6px 1px",
+  borderRadius: 8,
   border: "1px solid #cbd5e1",
+  background: "white",
 };
+
 
 const inputCenter = {
   ...input,
   textAlign: "center",
+};
+
+const deleteBtn = {
+  background: "none",
+  border: "none",
+  color: "red",
+  cursor: "pointer",
+  fontSize: 20,
+  fontWeight: "bold",
 };
 
 const btnGrey = {
@@ -624,6 +1064,7 @@ const btnGrey = {
   border: "none",
   background: "#e5e7eb",
   cursor: "pointer",
+  fontWeight: "bold",
 };
 
 const btnBlue = {
@@ -633,6 +1074,7 @@ const btnBlue = {
   background: "#2563eb",
   color: "white",
   cursor: "pointer",
+  fontWeight: "bold",
 };
 
 const btnGreen = {
@@ -647,17 +1089,22 @@ const btnGreen = {
   fontSize: 16,
 };
 
-const deleteBtn = {
-  background: "none",
-  border: "none",
-  color: "red",
-  cursor: "pointer",
-  fontSize: 20,
+const filterPopup = {
+  position: "absolute",
+  top: "100%",
+  left: 0,
+  background: "white",
+  padding: 10,
+  border: "1px solid #ccc",
+  borderRadius: 6,
+  boxShadow: "0 3px 8px rgba(0, 0, 0, 0.15)",
+  zIndex: 100,
+  width: 180,
 };
 
-// ========================================================================
+// ============================================================================
 // STYLES MOBILE
-// ========================================================================
+// ============================================================================
 const inpMobile = {
   width: "100%",
   padding: "12px",
@@ -677,6 +1124,7 @@ const btnMobile = {
   marginTop: 10,
   fontSize: 18,
   fontWeight: "bold",
+  cursor: "pointer",
 };
 
 const btnGreenMobile = {
@@ -688,4 +1136,5 @@ const btnGreenMobile = {
   width: "100%",
   fontSize: 18,
   fontWeight: "bold",
+  cursor: "pointer",
 };
