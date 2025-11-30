@@ -959,12 +959,13 @@ const page = {
   minHeight: "100vh",
   padding: 20,
   fontFamily: "Arial",
-  backgroundColor: "#f5f7fb",          // couleur de secours
-  backgroundImage: "url('/Fond.png')", // fichier dans /public
+  backgroundColor: "#ffffff",           // 🔁 avant : #f5f7fb (bleuté)
+  backgroundImage: "url('/Fond.png')",  // image de fond
   backgroundSize: "cover",
   backgroundPosition: "center",
   backgroundRepeat: "no-repeat",
 };
+
 
 
 const card = {
@@ -1006,10 +1007,12 @@ const select = {
 
 const table = {
   width: "100%",
-  borderCollapse: "collapse",
+  borderCollapse: "separate",  // 🔁 avant : "collapse"
+  borderSpacing: "8px 0",      // <-- espace horizontal identique entre toutes les cases
   marginBottom: 20,
   fontSize: 14,
 };
+
 
 const th = {
   background: "#eef2ff",
