@@ -1,10 +1,10 @@
 // --- SuiviTravaux.jsx ---
 // VERSION PC + VERSION MOBILE WIZARD
-// Appwrite + Auto code/prix/total + Responsive
-// ---------------------------------------------
+// Appwrite + Auto code/prix/total + Responsive + Description + Commentaire
+// -----------------------------------------------------------------------
 
 import React, { useEffect, useState } from "react";
-import { account, databases, ID } from "../appwrite";
+import { databases, ID } from "../appwrite";
 import * as XLSX from "xlsx";
 import { useNavigate } from "react-router-dom";
 
@@ -55,13 +55,10 @@ function weekNumber(d) {
   return Math.ceil(((date - yearStart) / 86400000 + 1) / 7);
 }
 
-// ============================================================================
-//   COMPONENT
-// ============================================================================
 export default function SuiviTravaux() {
   const navigate = useNavigate();
 
-  // 🔥 Mobile detection FIX
+  // Detect mobile
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
@@ -70,9 +67,7 @@ export default function SuiviTravaux() {
     return () => window.removeEventListener("resize", check);
   }, []);
 
-  // ------------------------------
   // STATE
-  // ------------------------------
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [rows, setRows] = useState([]);
@@ -80,16 +75,15 @@ export default function SuiviTravaux() {
 
   const [form, setForm] = useState({
     date: "",
+    description: "",
     travaux: "",
     code: "",
     quantite: "",
     prix: "",
-    total: "",
+    commentaire: "",
   });
 
-  // ------------------------------
   // LOAD DATA
-  // ------------------------------
   useEffect(() => {
     databases
       .listDocuments(DB_ID, COLLECTION)
@@ -97,12 +91,9 @@ export default function SuiviTravaux() {
       .catch((err) => console.error("Erreur loadRows:", err));
   }, []);
 
-  // Convertit virgule → point
   const norm = (v) => Number(String(v || 0).replace(",", "."));
 
-  // ------------------------------
   // UPDATE CELL
-  // ------------------------------
   async function updateCell(id, key, value) {
     try {
       const base = rows.find((r) => r.$id === id);
@@ -123,12 +114,12 @@ export default function SuiviTravaux() {
       }
 
       if (key === "travaux") {
-        const entry = Object.entries(tarifs).find(
+        const found = Object.entries(tarifs).find(
           ([, t]) => t.travaux === value
         );
-        if (entry) {
-          updated.code = entry[0];
-          updated.prix = entry[1].prix;
+        if (found) {
+          updated.code = found[0];
+          updated.prix = found[1].prix;
         }
       }
 
@@ -136,40 +127,33 @@ export default function SuiviTravaux() {
       updated.prix = norm(updated.prix);
       updated.total = Number((updated.quantite * updated.prix).toFixed(2));
 
-      const {
-        $id,
-        $collectionId,
-        $databaseId,
-        $createdAt,
-        $updatedAt,
-        ...clean
-      } = updated;
+      const { $id, $collectionId, $databaseId, $createdAt, $updatedAt, ...clean } =
+        updated;
 
       await databases.updateDocument(DB_ID, COLLECTION, id, clean);
 
-      setRows((prev) => prev.map((r) => (r.$id === id ? updated : r)));
+      setRows((p) => p.map((r) => (r.$id === id ? updated : r)));
     } catch (e) {
       console.error("Erreur updateCell :", e);
     }
   }
 
-  // ------------------------------
   // ADD ROW
-  // ------------------------------
   async function addRow() {
     try {
       const now = new Date();
       const row = {
         date: now.toISOString().split("T")[0],
+        description: "",
         semaine: weekNumber(now),
         mois: selectedMonth,
         annee: selectedYear,
-        plaque: "",
         travaux: "",
         code: "",
         quantite: 0,
         prix: 0,
         total: 0,
+        commentaire: "",
       };
 
       const doc = await databases.createDocument(
@@ -185,9 +169,7 @@ export default function SuiviTravaux() {
     }
   }
 
-  // ------------------------------
-  // DELETE
-  // ------------------------------
+  // DELETE ROW
   async function del(id) {
     if (!window.confirm("Supprimer ?")) return;
     try {
@@ -198,9 +180,7 @@ export default function SuiviTravaux() {
     }
   }
 
-  // ------------------------------
-  // EXPORT
-  // ------------------------------
+  // EXPORT EXCEL
   function exportExcel() {
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
@@ -208,15 +188,14 @@ export default function SuiviTravaux() {
     XLSX.writeFile(wb, "SuiviTravaux.xlsx");
   }
 
-  // ------------------------------
   // SAVE MOBILE
-  // ------------------------------
   async function saveMobile() {
     try {
       const d = new Date(form.date);
 
       const payload = {
         date: form.date,
+        description: form.description,
         semaine: weekNumber(d),
         mois: d.getMonth() + 1,
         annee: d.getFullYear(),
@@ -225,6 +204,7 @@ export default function SuiviTravaux() {
         quantite: norm(form.quantite),
         prix: norm(form.prix),
         total: Number((norm(form.quantite) * norm(form.prix)).toFixed(2)),
+        commentaire: form.commentaire,
       };
 
       await databases.createDocument(DB_ID, COLLECTION, ID.unique(), payload);
@@ -233,117 +213,146 @@ export default function SuiviTravaux() {
       setStep(1);
       setForm({
         date: "",
+        description: "",
         travaux: "",
         code: "",
         quantite: "",
         prix: "",
-        total: "",
+        commentaire: "",
       });
     } catch (e) {
       console.error("Erreur saveMobile:", e);
     }
   }
 
-  // ============================================================================
-  //   MOBILE WIZARD
-  // ============================================================================
+  // ========================================================================
+  // MOBILE WIZARD
+  // ========================================================================
   if (isMobile) {
-  return (
-    <div style={{ padding: 20, fontFamily: "Arial" }}>
-      <button onClick={() => navigate("/dashboard")}>⬅ Retour</button>
-      <h2>📱 Ajouter un travail</h2>
+    return (
+      <div style={{ padding: 20, fontFamily: "Arial" }}>
+        <button onClick={() => navigate("/dashboard")}>⬅ Retour</button>
+        <h2>📱 Ajouter un travail</h2>
 
-      {/* ÉTAPE 1 */}
-      {step === 1 && (
-        <>
-          <h3>📅 Date</h3>
-          <input
-            type="date"
-            value={form.date}
-            onChange={(e) => setForm({ ...form, date: e.target.value })}
-            style={inpMobile}
-          />
-          <button style={btnMobile} onClick={() => setStep(2)}>
-            Suivant ➡
-          </button>
-        </>
-      )}
+        {/* STEP 1 — DATE */}
+        {step === 1 && (
+          <>
+            <h3>📅 Date</h3>
+            <input
+              type="date"
+              value={form.date}
+              onChange={(e) => setForm({ ...form, date: e.target.value })}
+              style={inpMobile}
+            />
+            <button style={btnMobile} onClick={() => setStep(2)}>
+              Suivant ➡
+            </button>
+          </>
+        )}
 
-      {/* ÉTAPE 2 */}
-      {step === 2 && (
-        <>
-          <h3>🛠️ Travaux</h3>
-          <select
-            value={form.travaux}
-            onChange={(e) => {
-              const entry = Object.entries(tarifs).find(
-                ([, t]) => t.travaux === e.target.value
-              );
-              if (entry) {
-                setForm({
-                  ...form,
-                  travaux: entry[1].travaux,
-                  code: entry[0],
-                  prix: entry[1].prix,
-                });
-              } else setForm({ ...form, travaux: e.target.value });
-            }}
-            style={inpMobile}
-          >
-            <option value="">Choisir...</option>
-            {Object.entries(tarifs).map(([code, info]) => (
-              <option key={code} value={info.travaux}>
-                {info.travaux}
-              </option>
-            ))}
-          </select>
+        {/* STEP 2 — DESCRIPTION */}
+        {step === 2 && (
+          <>
+            <h3>📝 Description</h3>
+            <input
+              type="text"
+              placeholder="Ex: PMT 07215 DOU1"
+              value={form.description}
+              onChange={(e) =>
+                setForm({ ...form, description: e.target.value })
+              }
+              style={inpMobile}
+            />
+            <button style={btnMobile} onClick={() => setStep(3)}>
+              Suivant ➡
+            </button>
+          </>
+        )}
 
-          <button style={btnMobile} onClick={() => setStep(3)}>
-            Suivant ➡
-          </button>
-        </>
-      )}
+        {/* STEP 3 — TRAVAUX */}
+        {step === 3 && (
+          <>
+            <h3>🛠️ Travaux</h3>
+            <select
+              value={form.travaux}
+              onChange={(e) => {
+                const entry = Object.entries(tarifs).find(
+                  ([, t]) => t.travaux === e.target.value
+                );
+                if (entry) {
+                  setForm({
+                    ...form,
+                    travaux: entry[1].travaux,
+                    code: entry[0],
+                    prix: entry[1].prix,
+                  });
+                } else setForm({ ...form, travaux: e.target.value });
+              }}
+              style={inpMobile}
+            >
+              <option value="">Choisir...</option>
+              {Object.entries(tarifs).map(([code, info]) => (
+                <option key={code} value={info.travaux}>
+                  {info.travaux}
+                </option>
+              ))}
+            </select>
 
-      {/* ÉTAPE 3 */}
-      {step === 3 && (
-        <>
-          <h3>🔢 Quantité</h3>
-          <input
-            type="number"
-            value={form.quantite}
-            onChange={(e) =>
-              setForm({ ...form, quantite: e.target.value, total: "" })
-            }
-            style={inpMobile}
-          />
+            <button style={btnMobile} onClick={() => setStep(4)}>
+              Suivant ➡
+            </button>
+          </>
+        )}
 
-          <h3>💶 Prix</h3>
-          <input
-            type="number"
-            step="0.01"
-            value={form.prix}
-            onChange={(e) => setForm({ ...form, prix: e.target.value })}
-            style={inpMobile}
-          />
+        {/* STEP 4 — QUANTITE / PRIX / COMMENTAIRE */}
+        {step === 4 && (
+          <>
+            <h3>🔢 Quantité</h3>
+            <input
+              type="number"
+              value={form.quantite}
+              onChange={(e) =>
+                setForm({ ...form, quantite: e.target.value, total: "" })
+              }
+              style={inpMobile}
+            />
 
-          <h3>🧮 Total</h3>
-          <div style={{ fontSize: 24, marginBottom: 20 }}>
-            {(norm(form.quantite) * norm(form.prix)).toFixed(2)} €
-          </div>
+            <h3>💶 Prix</h3>
+            <input
+              type="number"
+              step="0.01"
+              value={form.prix}
+              onChange={(e) => setForm({ ...form, prix: e.target.value })}
+              style={inpMobile}
+            />
 
-          <button style={btnGreenMobile} onClick={saveMobile}>
-            ✅ Enregistrer
-          </button>
-        </>
-      )}
-    </div>
-  );
-}
+            <h3>💬 Commentaire</h3>
+            <input
+              type="text"
+              value={form.commentaire}
+              onChange={(e) =>
+                setForm({ ...form, commentaire: e.target.value })
+              }
+              style={inpMobile}
+            />
 
+            <h3>🧮 Total</h3>
+            <div style={{ fontSize: 24, marginBottom: 20 }}>
+              {(norm(form.quantite) * norm(form.prix)).toFixed(2)} €
+            </div>
 
-  // ============================================================================
-  //   DESKTOP VERSION
-  // ============================================================================
+            <button style={btnGreenMobile} onClick={saveMobile}>
+              ✅ Enregistrer
+            </button>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  // ========================================================================
+  // DESKTOP VERSION
+  // ========================================================================
   return (
     <div style={page}>
       <div style={card}>
@@ -360,9 +369,8 @@ export default function SuiviTravaux() {
           </button>
         </div>
 
-        {/* FILTRES */}
+        {/* FILTER MONTH/YEAR */}
         <div style={filterRow}>
-          {/* ANNÉE */}
           <select
             style={select}
             value={selectedYear}
@@ -377,7 +385,6 @@ export default function SuiviTravaux() {
             )}
           </select>
 
-          {/* MOIS */}
           <select
             style={select}
             value={selectedMonth}
@@ -404,18 +411,17 @@ export default function SuiviTravaux() {
           </select>
         </div>
 
-        {/* TABLE */}
+        {/* TABLE DESKTOP */}
         <table style={table}>
           <thead>
             <tr>
               <th style={th}>Date</th>
-              <th style={th}>Semaine</th>
-              <th style={th}>Plaque</th>
+              <th style={th}>Description</th>
               <th style={th}>Travaux</th>
-              <th style={th}>Code</th>
               <th style={th}>Quantité</th>
               <th style={th}>Prix</th>
               <th style={th}>Total</th>
+              <th style={th}>Commentaire</th>
               <th style={th}></th>
             </tr>
           </thead>
@@ -436,16 +442,13 @@ export default function SuiviTravaux() {
                     />
                   </td>
 
-                  {/* SEMAINE */}
-                  <td style={tdCenter}>{r.semaine}</td>
-
-                  {/* PLAQUE */}
+                  {/* DESCRIPTION */}
                   <td style={td}>
                     <input
                       style={input}
-                      value={r.plaque || ""}
+                      value={r.description || ""}
                       onChange={(e) =>
-                        updateCell(r.$id, "plaque", e.target.value)
+                        updateCell(r.$id, "description", e.target.value)
                       }
                     />
                   </td>
@@ -468,15 +471,6 @@ export default function SuiviTravaux() {
                     </select>
                   </td>
 
-                  {/* CODE */}
-                  <td style={td}>
-                    <input
-                      style={input}
-                      value={r.code || ""}
-                      onChange={(e) => updateCell(r.$id, "code", e.target.value)}
-                    />
-                  </td>
-
                   {/* QUANTITE */}
                   <td style={tdCenter}>
                     <input
@@ -496,12 +490,25 @@ export default function SuiviTravaux() {
                       step="0.01"
                       style={inputCenter}
                       value={r.prix}
-                      onChange={(e) => updateCell(r.$id, "prix", e.target.value)}
+                      onChange={(e) =>
+                        updateCell(r.$id, "prix", e.target.value)
+                      }
                     />
                   </td>
 
                   {/* TOTAL */}
                   <td style={tdCenter}>{Number(r.total).toFixed(2)} €</td>
+
+                  {/* COMMENTAIRE */}
+                  <td style={td}>
+                    <input
+                      style={input}
+                      value={r.commentaire || ""}
+                      onChange={(e) =>
+                        updateCell(r.$id, "commentaire", e.target.value)
+                      }
+                    />
+                  </td>
 
                   {/* DELETE */}
                   <td style={tdCenter}>
@@ -523,9 +530,9 @@ export default function SuiviTravaux() {
   );
 }
 
-// ============================================================================
-//   STYLES
-// ============================================================================
+// ========================================================================
+// STYLES DESKTOP
+// ========================================================================
 const page = {
   background: "#f5f7fb",
   minHeight: "100vh",
@@ -647,10 +654,10 @@ const deleteBtn = {
   cursor: "pointer",
   fontSize: 20,
 };
-// ------------------------------
-// STYLES MOBILE (NOUVEAUX NOMS)
-// ------------------------------
 
+// ========================================================================
+// STYLES MOBILE
+// ========================================================================
 const inpMobile = {
   width: "100%",
   padding: "12px",
@@ -682,4 +689,3 @@ const btnGreenMobile = {
   fontSize: 18,
   fontWeight: "bold",
 };
-
